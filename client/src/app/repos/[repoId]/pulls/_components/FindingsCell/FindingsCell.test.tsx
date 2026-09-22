@@ -1,7 +1,9 @@
 /**
  * FindingsCell — the PR list's FINDINGS column. The counters summarise; the
- * hover card lists every outstanding finding of the PR. Dismissed findings are
- * excluded on both sides, so the card header and the counters always agree.
+ * hover card lists the outstanding findings of each agent's latest run, summed
+ * — re-running one agent replaces its own previous run, a second agent adds to
+ * the total. Dismissed findings and off-contract severities are excluded on
+ * both sides, so the card header and the counters always agree.
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
@@ -42,7 +44,7 @@ function finding(o: Partial<FindingRecord> = {}): FindingRecord {
   };
 }
 
-function review(findings: FindingRecord[]): ReviewRecord {
+function review(findings: FindingRecord[], o: Partial<ReviewRecord> = {}): ReviewRecord {
   return {
     id: "r1",
     pr_id: "pr-1",
@@ -57,6 +59,7 @@ function review(findings: FindingRecord[]): ReviewRecord {
     grounding: null,
     created_at: "2026-06-01T12:00:00.000Z",
     findings,
+    ...o,
   } as ReviewRecord;
 }
 
@@ -131,7 +134,7 @@ describe("FindingsCell — hover card", () => {
 
     const card = screen.getByRole("dialog", { name: "Findings for this pull request" });
     expect(card).toBeInTheDocument();
-    expect(screen.getByText("2 findings")).toBeInTheDocument();
+    expect(screen.getByText("2 findings in this run")).toBeInTheDocument();
     expect(screen.getByText("Hardcoded Stripe secret key")).toBeInTheDocument();
     expect(screen.getByText("N+1 query in user list endpoint")).toBeInTheDocument();
     // Multi-line findings render as a range.
@@ -157,7 +160,7 @@ describe("FindingsCell — hover card", () => {
     renderCell({ counts: { critical: 1, warning: 0, suggestion: 0 } });
     hoverCell();
 
-    expect(screen.getByText("1 finding")).toBeInTheDocument();
+    expect(screen.getByText("1 finding in this run")).toBeInTheDocument();
     expect(screen.queryByText("Already handled")).not.toBeInTheDocument();
   });
 
@@ -177,8 +180,90 @@ describe("FindingsCell — hover card", () => {
     renderCell({ counts: { critical: 1, warning: 0, suggestion: 0 } });
     hoverCell();
 
-    expect(screen.getByText("1 finding")).toBeInTheDocument();
+    expect(screen.getByText("1 finding in this run")).toBeInTheDocument();
     expect(screen.queryByText("Odd one")).not.toBeInTheDocument();
+  });
+
+  it("sums the latest run of EACH agent", () => {
+    // Two agents are two opinions on the same PR — both belong in the card.
+    reviewsResult.current = {
+      data: [
+        review([finding({ id: "s1", title: "From the security agent" })], {
+          id: "r2",
+          run_id: "run-2",
+          agent_id: "agent-security",
+        }),
+        review([finding({ id: "p1", title: "From the perf agent" })], {
+          id: "r1",
+          run_id: "run-1",
+          agent_id: "agent-perf",
+        }),
+      ],
+      isLoading: false,
+      isError: false,
+    };
+    renderCell({ counts: { critical: 2, warning: 0, suggestion: 0 } });
+    hoverCell();
+
+    expect(screen.getByText("2 findings in this run")).toBeInTheDocument();
+    expect(screen.getByText("From the security agent")).toBeInTheDocument();
+    expect(screen.getByText("From the perf agent")).toBeInTheDocument();
+  });
+
+  it("drops a re-run agent's superseded findings, keeping the other agent's", () => {
+    reviewsResult.current = {
+      data: [
+        review([finding({ id: "new1", title: "Fresh run of agent A" })], {
+          id: "r3",
+          run_id: "run-3",
+          agent_id: "agent-a",
+        }),
+        review([finding({ id: "b1", title: "Agent B, not re-run" })], {
+          id: "r2",
+          run_id: "run-2",
+          agent_id: "agent-b",
+        }),
+        review([finding({ id: "old1", title: "Superseded run of agent A" })], {
+          id: "r1",
+          run_id: "run-1",
+          agent_id: "agent-a",
+        }),
+      ],
+      isLoading: false,
+      isError: false,
+    };
+    renderCell({ counts: { critical: 2, warning: 0, suggestion: 0 } });
+    hoverCell();
+
+    expect(screen.getByText("2 findings in this run")).toBeInTheDocument();
+    expect(screen.getByText("Fresh run of agent A")).toBeInTheDocument();
+    expect(screen.getByText("Agent B, not re-run")).toBeInTheDocument();
+    expect(screen.queryByText("Superseded run of agent A")).not.toBeInTheDocument();
+  });
+
+  it("keeps both review rows of one run together (a summary beside the review)", () => {
+    reviewsResult.current = {
+      data: [
+        review([finding({ id: "a", title: "From the review row" })], {
+          id: "r2",
+          run_id: "run-9",
+          agent_id: "agent-a",
+        }),
+        review([finding({ id: "b", title: "From the summary row" })], {
+          id: "r3",
+          run_id: "run-9",
+          kind: "summary",
+          agent_id: "agent-a",
+        }),
+      ],
+      isLoading: false,
+      isError: false,
+    };
+    renderCell({ counts: { critical: 2, warning: 0, suggestion: 0 } });
+    hoverCell();
+
+    expect(screen.getByText("2 findings in this run")).toBeInTheDocument();
+    expect(screen.getByText("From the summary row")).toBeInTheDocument();
   });
 
   it("does not open when the PR is reviewed but has nothing outstanding", () => {
@@ -204,6 +289,37 @@ describe("FindingsCell — hover card", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("stays open while its own findings list is scrolled", () => {
+    // `scroll` doesn't bubble, so the listener has to be capture-phase — which
+    // means it also sees the card's own scrollable body. Scrolling the list
+    // must not close the thing being scrolled.
+    reviewsResult.current = {
+      data: [review([finding(), finding({ id: "f2", title: "Second finding" })])],
+      isLoading: false,
+      isError: false,
+    };
+    renderCell();
+    hoverCell();
+    const card = screen.getByRole("dialog");
+
+    fireEvent.scroll(card.querySelector("div:last-of-type")!);
+    expect(screen.queryByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.scroll(card);
+    expect(screen.queryByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("still closes when the page behind it scrolls", () => {
+    reviewsResult.current = { data: [review([finding()])], isLoading: false, isError: false };
+    renderCell();
+    hoverCell();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    // A fixed-position card would drift away from its row, so this one closes.
+    fireEvent.scroll(document.body);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 

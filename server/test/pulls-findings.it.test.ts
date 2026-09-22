@@ -7,11 +7,13 @@ import { MockEmbedder, MockGitClient } from '../src/adapters/mocks.js';
 import * as t from '../src/db/schema.js';
 
 /**
- * The PR list's FINDINGS column: a per-severity tally across EVERY review run
- * of the PR, with dismissed findings excluded (the column answers "what is
- * still outstanding"). `null` means never reviewed — the same "—" signal the
- * SCORE ring uses — and must stay distinguishable from a reviewed PR that has
- * nothing left, which is {0,0,0}.
+ * The PR list's FINDINGS column: a per-severity tally of the LATEST run of EACH
+ * agent, summed — the PR's current verdict, every agent's newest word on it.
+ * Re-running one agent replaces its own earlier run; a second agent adds to the
+ * total. Dismissed findings are excluded (the column answers "what is still
+ * outstanding"). `null` means never reviewed — the same "—" signal the SCORE
+ * ring uses — and must stay distinguishable from a reviewed PR that has nothing
+ * left, which is {0,0,0}.
  */
 
 const hasDocker = await dockerAvailable();
@@ -73,16 +75,34 @@ d('PR list findings breakdown (Testcontainers pg)', () => {
     return { repo: repo!, prs, pr: prs[0]! };
   }
 
+  /** `createdAt` is explicit so "which run is latest" never depends on timing. */
   async function insertReview(
     prId: string,
-    kind: 'review' | 'summary' = 'review',
+    opts: {
+      kind?: 'review' | 'summary';
+      runId?: string;
+      agentId?: string;
+      at?: Date;
+    } = {},
   ): Promise<string> {
     const [row] = await pg.handle.db
       .insert(t.reviews)
-      .values({ workspaceId, prId, kind, verdict: 'request_changes', score: 61 })
+      .values({
+        workspaceId,
+        prId,
+        kind: opts.kind ?? 'review',
+        runId: opts.runId ?? null,
+        agentId: opts.agentId ?? null,
+        verdict: 'request_changes',
+        score: 61,
+        ...(opts.at ? { createdAt: opts.at } : {}),
+      })
       .returning({ id: t.reviews.id });
     return row!.id;
   }
+
+  const OLDER = new Date('2026-06-01T10:00:00.000Z');
+  const NEWER = new Date('2026-06-02T10:00:00.000Z');
 
   async function insertFinding(
     reviewId: string,
@@ -109,19 +129,63 @@ d('PR list findings breakdown (Testcontainers pg)', () => {
     return rows[0];
   }
 
-  it('sums the breakdown across every review run of the PR', async () => {
+  it("sums the latest run of EACH agent — two agents add up", async () => {
     const a = await app();
     const { repo, pr } = await repoWithPrs();
-    const first = await insertReview(pr.id);
-    await insertFinding(first, 'CRITICAL');
-    await insertFinding(first, 'WARNING');
-    // A second agent (or a re-run) adds to the same PR's tally.
-    const second = await insertReview(pr.id);
-    await insertFinding(second, 'CRITICAL');
-    await insertFinding(second, 'SUGGESTION');
+    const security = crypto.randomUUID();
+    const perf = crypto.randomUUID();
+    const one = await insertReview(pr.id, { agentId: security, runId: crypto.randomUUID() });
+    await insertFinding(one, 'CRITICAL');
+    await insertFinding(one, 'WARNING');
+    const two = await insertReview(pr.id, { agentId: perf, runId: crypto.randomUUID() });
+    await insertFinding(two, 'CRITICAL');
+    await insertFinding(two, 'SUGGESTION');
 
+    // Different agents are different opinions on the same PR — both count.
     expect((await listOne(a, repo.id)).findings_counts).toEqual({
       critical: 2,
+      warning: 1,
+      suggestion: 1,
+    });
+
+    await a.close();
+  });
+
+  it("re-running ONE agent replaces that agent's earlier run", async () => {
+    const a = await app();
+    const { repo, pr } = await repoWithPrs();
+    const agentId = crypto.randomUUID();
+    const stale = await insertReview(pr.id, { agentId, runId: crypto.randomUUID(), at: OLDER });
+    await insertFinding(stale, 'CRITICAL');
+    await insertFinding(stale, 'WARNING');
+    const fresh = await insertReview(pr.id, { agentId, runId: crypto.randomUUID(), at: NEWER });
+    await insertFinding(fresh, 'SUGGESTION');
+
+    // The superseded run's 2 findings are gone, not added in.
+    expect((await listOne(a, repo.id)).findings_counts).toEqual({
+      critical: 0,
+      warning: 0,
+      suggestion: 1,
+    });
+
+    await a.close();
+  });
+
+  it("keeps each agent's newest run when some agents re-ran and others didn't", async () => {
+    const a = await app();
+    const { repo, pr } = await repoWithPrs();
+    const reRun = crypto.randomUUID();
+    const untouched = crypto.randomUUID();
+    const stale = await insertReview(pr.id, { agentId: reRun, runId: crypto.randomUUID(), at: OLDER });
+    await insertFinding(stale, 'CRITICAL');
+    const other = await insertReview(pr.id, { agentId: untouched, runId: crypto.randomUUID(), at: OLDER });
+    await insertFinding(other, 'WARNING');
+    const fresh = await insertReview(pr.id, { agentId: reRun, runId: crypto.randomUUID(), at: NEWER });
+    await insertFinding(fresh, 'SUGGESTION');
+
+    // The other agent's older run is still current FOR THAT AGENT, so it stays.
+    expect((await listOne(a, repo.id)).findings_counts).toEqual({
+      critical: 0,
       warning: 1,
       suggestion: 1,
     });
@@ -146,16 +210,21 @@ d('PR list findings breakdown (Testcontainers pg)', () => {
     await a.close();
   });
 
-  it("counts a 'summary' review's findings too — GET /pulls/:id/reviews does not filter kind", async () => {
+  it("includes a 'summary' review's findings when it belongs to the same run", async () => {
     const a = await app();
     const { repo, pr } = await repoWithPrs();
-    const summary = await insertReview(pr.id, 'summary');
+    const runId = crypto.randomUUID();
+    const agentId = crypto.randomUUID();
+    const review = await insertReview(pr.id, { kind: 'review', runId, agentId, at: NEWER });
+    await insertFinding(review, 'CRITICAL');
+    const summary = await insertReview(pr.id, { kind: 'summary', runId, agentId, at: NEWER });
     await insertFinding(summary, 'WARNING');
 
-    // Were the query to filter kind='review', the PR page would list a finding
-    // the list column never counted.
+    // Same agent, same run, two rows: the run_id grouping must keep both rather
+    // than treat the summary as a superseded run. GET /pulls/:id/reviews doesn't
+    // filter kind either.
     expect((await listOne(a, repo.id)).findings_counts).toEqual({
-      critical: 0,
+      critical: 1,
       warning: 1,
       suggestion: 0,
     });

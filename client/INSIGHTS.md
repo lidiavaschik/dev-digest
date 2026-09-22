@@ -26,16 +26,22 @@ Keep each entry ≤5 lines. Agents only append; changing, moving to CLAUDE.md or
 - What: `s.tableCard` sets `overflow: "hidden"` for its rounded corners, so any panel rendered inside a row is clipped at the table edge; the kit `Dropdown` hits the same wall (it is `position: absolute` and click-triggered).
 - Why: verified in Chrome — the portalled card paints at y≈12 while the table starts at y≈160, which a descendant of an `overflow: hidden` box cannot do.
 - Rule: `createPortal(node, document.body)` + `position: fixed` from `getBoundingClientRect()`, and close on scroll/resize — see toast.tsx / kit/Drawer.tsx for the same pattern.
-- Evidence: src/app/repos/[repoId]/pulls/_components/FindingsCell/FindingsHoverCard.tsx · styles.ts `tableCard`
+- Evidence: src/app/repos/[repoId]/pulls/_components/FindingsCell/FindingsHoverCard.tsx:46 · src/app/repos/[repoId]/pulls/styles.ts:108
 
 ## Tool & Library Notes
 <!-- Quirks of dependencies and tools -->
+
+### 2026-09-22 — "close on scroll" closes a popover when you scroll the popover
+- What: `window.addEventListener("scroll", close, true)` fired for the hover card's OWN scrollable body, so scrolling the findings list shut it mid-read.
+- Why: `scroll` doesn't bubble, so the listener must be capture-phase — and capture runs window→target for EVERY scroll, including inside the popover.
+- Rule: in that handler, bail when `cardRef.current?.contains(e.target)`; only a scroll outside the popover should dismiss it.
+- Evidence: src/app/repos/[repoId]/pulls/_components/FindingsCell/FindingsCell.tsx:100 · FindingsCell.test.tsx:210 "stays open while its own findings list is scrolled"
 
 ### 2026-09-22 — `useRouter: () => ({ push: vi.fn() })` makes navigation unassertable
 - What: that next/navigation mock hands out a FRESH spy per `useRouter()` call, so `expect(push).toHaveBeenCalledWith(...)` always sees 0 calls — the test can only prove a click didn't throw.
 - Why: the factory runs per call, not per module; the spy the test holds is never the one the component used.
 - Rule: hoist one stable spy — `const push = vi.hoisted(() => vi.fn())` + `beforeEach(push.mockClear)` — whenever a test asserts where a click navigates.
-- Evidence: src/app/repos/[repoId]/pulls/_components/PRRow/PRRow.test.tsx (click reaches the row)
+- Evidence: src/app/repos/[repoId]/pulls/_components/PRRow/PRRow.test.tsx:16 (hoisted spy; "click reaches the row")
 
 ## Recurring Errors & Fixes
 <!-- Exact error text → cause → fix -->

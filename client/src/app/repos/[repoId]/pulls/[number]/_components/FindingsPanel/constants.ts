@@ -1,4 +1,14 @@
-import type { FindingActionKind } from "@devdigest/shared";
+import type { FindingActionKind, Severity } from "@devdigest/shared";
+
+/**
+ * The three severities in display order, with the lowercase key their label
+ * lives under in messages/en/prReview.json (`severity.*`).
+ */
+export const SEVERITIES: { key: Severity; labelKey: "critical" | "warning" | "suggestion" }[] = [
+  { key: "CRITICAL", labelKey: "critical" },
+  { key: "WARNING", labelKey: "warning" },
+  { key: "SUGGESTION", labelKey: "suggestion" },
+];
 
 /** Sort weight per severity (lower = shown first). */
 export const SEVERITY_ORDER: Record<string, number> = {

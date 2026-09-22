@@ -18,6 +18,7 @@ import { c } from "./styles";
 
 export function FindingsHoverCard({
   id,
+  cardRef,
   findings,
   isLoading,
   isError,
@@ -27,6 +28,8 @@ export function FindingsHoverCard({
   onMouseLeave,
 }: {
   id: string;
+  /** Lets the owner tell "scrolled the card" from "scrolled the page apart". */
+  cardRef: React.RefObject<HTMLDivElement | null>;
   findings: FindingRecord[];
   isLoading: boolean;
   isError: boolean;
@@ -43,6 +46,7 @@ export function FindingsHoverCard({
   return createPortal(
     <div
       id={id}
+      ref={cardRef}
       role="dialog"
       aria-label={t("list.findings.cardAria")}
       onMouseEnter={onMouseEnter}

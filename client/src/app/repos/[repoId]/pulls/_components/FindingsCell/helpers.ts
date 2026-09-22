@@ -3,12 +3,38 @@ import type { SeverityCounts } from "@/lib/types";
 import { CARD_MAX_HEIGHT, CARD_WIDTH, SEVERITY_ORDER, VIEWPORT_MARGIN } from "./constants";
 
 /**
- * Every still-outstanding finding of a PR, newest-run-first flattened and
- * sorted by severity. Dismissed findings are dropped so the card's header count
- * matches the three counters (which the server computes the same way).
+ * The review rows of each agent's LATEST run — re-running one agent replaces
+ * its own previous run, while a second agent adds to the total. Mirrors the
+ * server's scoping for the FINDINGS column, so the card and the counters agree.
+ *
+ * `GET /pulls/:id/reviews` returns rows newest-first, so the first row seen per
+ * agent names that agent's current run. The run_id match (rather than that one
+ * row) keeps a 'summary' row beside its 'review' together, which the contract
+ * allows; a review with no agent_id can't be grouped, so it stands alone.
+ */
+export function latestRunReviews(reviews: ReviewRecord[] | undefined): ReviewRecord[] {
+  const all = reviews ?? [];
+  const key = (r: ReviewRecord) => r.agent_id ?? `review:${r.id}`;
+  const latestPerAgent = new Map<string, { runId: string | null; reviewId: string }>();
+  for (const r of all) {
+    if (!latestPerAgent.has(key(r))) {
+      latestPerAgent.set(key(r), { runId: r.run_id ?? null, reviewId: r.id });
+    }
+  }
+  return all.filter((r) => {
+    const latest = latestPerAgent.get(key(r));
+    if (!latest) return false;
+    return latest.runId ? r.run_id === latest.runId : latest.reviewId === r.id;
+  });
+}
+
+/**
+ * Every still-outstanding finding of those runs, sorted by severity. Dismissed
+ * findings are dropped so the card's header count matches the three counters
+ * (which the server computes the same way).
  */
 export function cardFindings(reviews: ReviewRecord[] | undefined): FindingRecord[] {
-  return (reviews ?? [])
+  return latestRunReviews(reviews)
     .flatMap((r) => r.findings)
     // `findings.severity` is an unconstrained text column, and the server's
     // rollupSeverities silently ignores anything outside the three. Match it,

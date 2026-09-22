@@ -6,10 +6,10 @@
   },
   "finding": {
     "accepted": "accepted",
-    "dismissed": "dismissed",
+    "dismissed": "rejected",
     "suggestedFix": "Suggested fix",
     "accept": "Accept",
-    "dismiss": "Dismiss",
+    "dismiss": "Reject",
     "learn": "Learn",
     "replyToAuthor": "Reply to author",
     "replyPlaceholder": "Reply to the author about this finding…",
@@ -32,6 +32,8 @@
     "prScore": "PR SCORE"
   },
   "panel": {
+    "severityCounts": "Findings by severity in this run",
+    "severityCount": "{count} {severity}",
     "hideLowConfidence": "Hide low confidence",
     "noMatchTitle": "No findings match",
     "noMatchBody": "Adjust the filters above, or run a review to generate findings."
@@ -105,7 +107,7 @@
       "aria": "{severity}: {count}",
       "notReviewed": "Not reviewed yet",
       "cardAria": "Findings for this pull request",
-      "cardTitle": "{count, plural, one {# finding} other {# findings}}",
+      "cardTitle": "{count, plural, one {# finding} other {# findings}} in this run",
       "loading": "Loading findings…",
       "error": "Couldn’t load findings"
     },

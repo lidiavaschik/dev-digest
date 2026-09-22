@@ -35,6 +35,7 @@ export function FindingsCell({
 }) {
   const t = useTranslations("prReview");
   const groupRef = React.useRef<HTMLDivElement | null>(null);
+  const cardRef = React.useRef<HTMLDivElement | null>(null);
   const openTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pos, setPos] = React.useState<{ top: number; left: number } | null>(null);
@@ -91,11 +92,19 @@ export function FindingsCell({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
-    window.addEventListener("scroll", close, true);
+    // The listener is on the capture phase because `scroll` doesn't bubble —
+    // which also means it fires for the card's OWN scrollable body. Scrolling
+    // the findings list must not close the thing you're scrolling.
+    const onScroll = (e: Event) => {
+      const target = e.target as Node | null;
+      if (target && cardRef.current?.contains(target)) return;
+      close();
+    };
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", close);
     window.addEventListener("keydown", onKey);
     return () => {
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", close);
       window.removeEventListener("keydown", onKey);
     };
@@ -147,6 +156,7 @@ export function FindingsCell({
       {open && pos && (
         <FindingsHoverCard
           id={cardId}
+          cardRef={cardRef}
           findings={findings}
           isLoading={isLoading}
           isError={isError}
