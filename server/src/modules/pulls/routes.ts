@@ -1,13 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { and, desc, eq, inArray, sum } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sum } from 'drizzle-orm';
 import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
-import { deriveReviewStatus } from './status.js';
+import { deriveReviewStatus, rollupSeverities, type SeverityCounts } from './status.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
@@ -113,20 +113,87 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
 
     // Latest-review SCORE per PR for the list's score ring. Computed on read
     // from reviews (no FK denorm); the list is small, so one IN-query + JS
-    // grouping is cheap. (The per-severity FINDINGS breakdown is intentionally
-    // not surfaced on the list — findings live on the PR detail page.)
+    // grouping is cheap. The same pass collects which PRs have ANY review row,
+    // which is what tells "never reviewed" apart from "reviewed, zero findings"
+    // in the FINDINGS breakdown below.
     const prIds = rows.map((r) => r.id);
     const latestReviewByPr = new Map<string, { score: number | null }>();
+    const reviewedPrIds = new Set<string>();
+    // review.id → pr.id, and the subset of review ids belonging to each PR's
+    // LATEST run — the findings breakdown below is scoped to that one run.
+    const prByReviewId = new Map<string, string>();
+    const latestRunReviewIds: string[] = [];
     if (prIds.length > 0) {
       const reviewRows = await container.db
-        .select({ prId: t.reviews.prId, score: t.reviews.score })
+        .select({
+          id: t.reviews.id,
+          prId: t.reviews.prId,
+          runId: t.reviews.runId,
+          agentId: t.reviews.agentId,
+          score: t.reviews.score,
+          kind: t.reviews.kind,
+        })
         .from(t.reviews)
-        .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')))
+        .where(and(eq(t.reviews.workspaceId, workspaceId), inArray(t.reviews.prId, prIds)))
         .orderBy(desc(t.reviews.createdAt));
-      // Rows are newest-first → first seen per PR is the latest review.
+      // Rows are newest-first → first seen is the latest. Only a 'review' row
+      // carries a score, but ANY row means the PR was reviewed.
+      //
+      // The findings tally is "the latest run of EACH agent, summed": re-running
+      // one agent replaces its own previous run, while a second agent adds to
+      // the total. Keyed per (pr, agent) for exactly that. A review with no
+      // agent_id can't be grouped, so it stands alone and is always kept.
+      const agentKey = (rv: { prId: string; agentId: string | null; id: string }) =>
+        `${rv.prId}::${rv.agentId ?? `review:${rv.id}`}`;
+      const latestRunByAgent = new Map<string, { runId: string | null; reviewId: string }>();
       for (const rv of reviewRows) {
-        if (!latestReviewByPr.has(rv.prId)) latestReviewByPr.set(rv.prId, { score: rv.score });
+        reviewedPrIds.add(rv.prId);
+        prByReviewId.set(rv.id, rv.prId);
+        const key = agentKey(rv);
+        if (!latestRunByAgent.has(key)) {
+          latestRunByAgent.set(key, { runId: rv.runId, reviewId: rv.id });
+        }
+        if (rv.kind === 'review' && !latestReviewByPr.has(rv.prId)) {
+          latestReviewByPr.set(rv.prId, { score: rv.score });
+        }
       }
+      // Match on run_id rather than on the single newest row: the contract
+      // allows a run to leave a 'summary' row beside its 'review' (only
+      // 'review' is written today — run-executor.ts), and GET /pulls/:id/reviews
+      // returns every kind. Reviews predating run_id fall back to the row itself.
+      for (const rv of reviewRows) {
+        const latest = latestRunByAgent.get(agentKey(rv));
+        if (!latest) continue;
+        const inLatest = latest.runId ? rv.runId === latest.runId : rv.id === latest.reviewId;
+        if (inLatest) latestRunReviewIds.push(rv.id);
+      }
+    }
+
+    // Per-severity FINDINGS breakdown for the list's findings column: the
+    // latest run of each agent, summed. That is the PR's current verdict —
+    // every agent's newest word on it — without counting a superseded re-run
+    // twice. DISMISSED findings are left out: the column answers "what is
+    // still outstanding".
+    const findingsByPr = new Map<string, SeverityCounts>();
+    if (latestRunReviewIds.length > 0) {
+      const findingRows = await container.db
+        .select({ reviewId: t.findings.reviewId, severity: t.findings.severity })
+        .from(t.findings)
+        .where(
+          and(
+            inArray(t.findings.reviewId, latestRunReviewIds),
+            isNull(t.findings.dismissedAt),
+          ),
+        );
+      const grouped = new Map<string, { severity: string }[]>();
+      for (const f of findingRows) {
+        const prId = prByReviewId.get(f.reviewId);
+        if (!prId) continue;
+        const list = grouped.get(prId);
+        if (list) list.push(f);
+        else grouped.set(prId, [f]);
+      }
+      for (const [prId, findings] of grouped) findingsByPr.set(prId, rollupSeverities(findings));
     }
 
     // Total spend per PR for the list's COST column: the SUM of every agent
@@ -168,6 +235,11 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
         cost_usd: costByPr.get(r.id) ?? null,
+        // Null = never reviewed (the "—" the score ring also shows); {0,0,0} =
+        // reviewed with nothing outstanding.
+        findings_counts: reviewedPrIds.has(r.id)
+          ? findingsByPr.get(r.id) ?? { critical: 0, warning: 0, suggestion: 0 }
+          : null,
       };
     });
   });

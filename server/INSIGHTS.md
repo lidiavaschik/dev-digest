@@ -22,6 +22,18 @@ Keep each entry ≤5 lines. Agents only append; changing, moving to CLAUDE.md or
 ## Codebase Patterns
 <!-- Non-obvious conventions or decisions with rationale, not already in CLAUDE.md -->
 
+### 2026-09-22 — a PR's current findings = the latest run of EACH agent, summed
+- What: neither "all runs" (double-counts a re-run) nor "the newest run" (drops the other agents) is right; a PR is reviewed by several agents, each of which can be re-run independently.
+- Why: got this wrong twice — `reviews` rows are per (agent, run), so the grouping key is (pr_id, agent_id) and the newest run_id within each group wins.
+- Rule: ALWAYS group by (pr_id, agent_id) first, take that agent's newest run_id, then sum — and mirror it client-side, or the list column and the PR page disagree.
+- Evidence: src/modules/pulls/routes.ts:130 · test/pulls-findings.it.test.ts "sums the latest run of EACH agent" · client latestRunReviews()
+
+### 2026-09-22 — PR-level finding aggregates must NOT filter `reviews.kind`
+- What: `reviewsForPull` returns every review row, 'summary' included, so a rollup adding `eq(t.reviews.kind, 'review')` under-counts vs what the PR page shows.
+- Why: the adjacent latest-SCORE query *does* filter kind (only 'review' rows carry a score), so copying it into a findings query is the natural, wrong move.
+- Rule: NEVER filter `kind` when aggregating findings per PR; filter it only when reading a score.
+- Evidence: src/modules/reviews/repository/review.repo.ts:58 · test/pulls-findings.it.test.ts "counts a 'summary' review's findings too"
+
 ## Tool & Library Notes
 <!-- Quirks of dependencies and tools -->
 
