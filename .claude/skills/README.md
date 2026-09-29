@@ -18,6 +18,7 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [typescript-expert](typescript-expert/SKILL.md) | Full-stack | Type-level programming, performance, tooling, migrations |
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
+| [pr-self-review](pr-self-review/SKILL.md) | Shared | Pre-PR gate: routes the local diff to the skills above (UI → frontend, server → backend), runs typecheck/depcruise/tests, blocks push/PR on any CRITICAL (hand-authored, not vendored) |
 | [engineering-insights](engineering-insights/SKILL.md) | Shared | Learnings loop: read per-package INSIGHTS.md before work, record verified lessons after (hand-authored, not vendored) |
 
 ## What Are Skills?

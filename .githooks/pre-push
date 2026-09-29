@@ -1,0 +1,5 @@
+#!/bin/sh
+# Blocks pushing a feature branch unless /pr-self-review PASSED on exactly the current changes.
+# Enabled by `git config core.hooksPath .githooks` (scripts/dev.sh does it).
+# Emergency bypass (humans only): PR_SELF_REVIEW_SKIP=1 git push   or   git push --no-verify
+exec node "$(git rev-parse --show-toplevel)/.claude/skills/pr-self-review/scripts/gate.mjs" --git "$@"

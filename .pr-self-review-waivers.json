@@ -1,0 +1,4 @@
+{
+  "$comment": "Consciously accepted pr-self-review findings. Added by a human, never by the agent. Format and rules: .claude/skills/pr-self-review/SKILL.md#waivers-user-decision-only",
+  "waivers": []
+}

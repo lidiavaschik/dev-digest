@@ -34,6 +34,9 @@ Each package also has docs/ (notes), specs/ (feature specs), INSIGHTS.md (lesson
 - DB change = edit server/src/db/schema/* then `cd server && pnpm db:generate`.
 - Secrets never go to git/DB: they live in ~/.devdigest/secrets.json (0600) or .env.
 - New cross-package alias → add it to the CI `paths:` filters in .github/workflows.
+- Before `git push` / `gh pr create` / `gh pr merge` → run the pr-self-review skill. A PreToolUse hook
+  (.claude/settings.json) and .githooks/pre-push block them until it PASSES on the current diff;
+  never bypass the gate (--no-verify / PR_SELF_REVIEW_SKIP are for the user only).
 
 ## Insights loop (engineering-insights skill) — do not skip
 - After the user's prompt, before the first action: read `<pkg>/INSIGHTS.md` of every package
@@ -47,8 +50,9 @@ Each package also has docs/ (notes), specs/ (feature specs), INSIGHTS.md (lesson
 - server/clones/** — runtime data (git-ignored); git remotes there contain the GitHub token.
 - server/package.json is `skip-worktree` locally — don't "fix" diffs against committed scripts.
 - .claude/skills/** and skills-lock.json — vendored via the skills CLI, not hand-edited.
-  Exceptions: .claude/skills/engineering-insights/, .claude/skills/frontend-architecture/ and
-  .claude/skills/onion-architecture/ are hand-authored for this repo (not in skills-lock.json) — edit freely.
+  Exceptions: .claude/skills/engineering-insights/, .claude/skills/frontend-architecture/,
+  .claude/skills/onion-architecture/ and .claude/skills/pr-self-review/ are hand-authored for this
+  repo (not in skills-lock.json) — edit freely.
 
 ## Read when
 - Architecture / end-to-end flow → README.md
