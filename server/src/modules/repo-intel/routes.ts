@@ -33,9 +33,11 @@ export default async function repoIntelRoutes(appBase: FastifyInstance) {
     '/repos/:id/index-state',
     { schema: { params: IdParams } },
     async (req): Promise<IndexState> => {
-      // Resolve tenancy so the request is workspace-scoped even though the
-      // facade itself is tenant-agnostic (consistent with blast routes).
-      await getContext(container, req);
+      // The facade is tenant-agnostic (its tables are keyed by repo_id), so the
+      // repo id from the URL has to be checked against the caller's workspace
+      // here — resolving the context alone does not scope anything.
+      const { workspaceId } = await getContext(container, req);
+      await service.assertRepoInWorkspace(req.params.id, workspaceId);
       return container.repoIntel.getIndexState(req.params.id);
     },
   );
@@ -45,6 +47,7 @@ export default async function repoIntelRoutes(appBase: FastifyInstance) {
     { schema: { params: IdParams } },
     async (req, reply) => {
       const { workspaceId } = await getContext(container, req);
+      await service.assertRepoInWorkspace(req.params.id, workspaceId);
       // 202 even when enqueue fails (no handler / DB hiccup) so the UI can
       // still poll /index-state without an inline error path. The actual
       // outcome shows up in `repo_index_state` once the worker runs.

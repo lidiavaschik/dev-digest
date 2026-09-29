@@ -20,7 +20,10 @@ export function AgentEditor({ agent, tab, onTab }: { agent: Agent; tab: string; 
         <Tabs tabs={tabs} value={tab} onChange={onTab} pad="0 24px" />
       </div>
       <div style={s.body}>
-        <ConfigTab agent={agent} />
+        {/* key={agent.id} IS the form reset: switching agents remounts the tab
+            with fresh useState seeds. An Effect that re-set every field instead
+            rendered once with the previous agent's values still on screen. */}
+        <ConfigTab key={agent.id} agent={agent} />
       </div>
     </div>
   );

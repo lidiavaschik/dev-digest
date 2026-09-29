@@ -1,7 +1,7 @@
 # reviewer-core — pure review engine (diff → prompt → LLM → grounded findings)
 
 ## Commands (npm)
-npm test · npm run typecheck (= build; the package never emits JS)
+npm test · npm run typecheck (= build; the package never emits JS) · npm run arch:check (dependency-cruiser)
 
 ## Layout
 src/index.ts             public API — export everything through here
@@ -13,6 +13,7 @@ src/output/to-review.ts  CI payload helper (used from L06)
 
 ## Rules
 - NO I/O: no DB, fs, GitHub, env. The only side effect is the injected LLMProvider.
+  openai SDK only in src/llm/; from ../server only @devdigest/shared (onion-architecture skill, `arch:check`).
 - Contracts come from @devdigest/shared (../server/src/vendor/shared); don't redefine types here.
 - zod is pinned to this package's node_modules via tsconfig paths — keep it.
 - Optional prompt slots (skills, memory, specs, callers, repoMap): empty → section omitted.

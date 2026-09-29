@@ -19,6 +19,12 @@ Keep each entry ≤5 lines. Agents only append; changing, moving to CLAUDE.md or
 ## What Doesn't Work
 <!-- Failed approaches / anti-patterns, with the reason -->
 
+### 2026-09-29 — wrapping `skills` / `memory` in `<untrusted>` disarms them
+- What: the obvious "fix" for community skill bodies reaching the prompt unwrapped is to send them through `wrapUntrusted` like the diff. It silently breaks reviews: INJECTION_GUARD tells the model everything inside those delimiters is DATA and to ignore instructions in it — and a skill IS instructions ("flag secrets", "check for N+1").
+- Why: the guard's blast radius is the delimiter, so wrapping is only correct for content the model must not obey. Skills and memory are content it must obey.
+- Rule: never wrap skills/memory as untrusted. Neutralize delimiters inside them (`neutralizeDelimiters`, so a body can't forge or close a block) and vet what a community skill *says* at install time, not in prompt assembly.
+- Evidence: src/prompt.ts (skillsBlock/memoryBlock comment) · test/prompt.test.ts "neutralizes delimiters in a skill body without wrapping skills as data"
+
 ## Codebase Patterns
 <!-- Non-obvious conventions or decisions with rationale, not already in CLAUDE.md -->
 

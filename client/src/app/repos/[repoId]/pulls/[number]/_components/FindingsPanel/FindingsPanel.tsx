@@ -41,10 +41,17 @@ export function FindingsPanel({
   const counts = React.useMemo(() => countBySeverity(candidates), [candidates]);
   const shown = React.useMemo(() => bySeverity(candidates, severity), [candidates, severity]);
 
-  // A changed filter invalidates the cursor. Keyed on the filters, not on
-  // `shown` — that gets a new identity on every background refetch and would
-  // yank the cursor mid-read.
-  React.useEffect(() => setFocusIdx(0), [severity, hideLow]);
+  // A changed filter invalidates the cursor. Adjusted DURING render rather than
+  // in an Effect: an Effect paints one frame with the old cursor against the new
+  // list, so the wrong card is highlighted for a tick. React re-runs this
+  // component immediately on the setState below, before touching the DOM.
+  // Keyed on the filters, not on `shown` — that gets a new identity on every
+  // background refetch and would yank the cursor mid-read.
+  const [cursorFilters, setCursorFilters] = React.useState({ severity, hideLow });
+  if (cursorFilters.severity !== severity || cursorFilters.hideLow !== hideLow) {
+    setCursorFilters({ severity, hideLow });
+    setFocusIdx(0);
+  }
 
   // j/k navigation + a/d shortcuts on the focused finding (keyboard).
   React.useEffect(() => {

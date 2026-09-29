@@ -147,6 +147,19 @@ export class RepoIntelRepository {
     return row ?? null;
   }
 
+  /**
+   * Owning workspace of a repo, or null when the id matches no row. The facade
+   * itself is tenant-agnostic (every table here is keyed by repo_id), so this is
+   * how callers turn a URL-supplied repo id into a tenancy decision.
+   */
+  async workspaceIdForRepo(repoId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ workspaceId: t.repos.workspaceId })
+      .from(t.repos)
+      .where(eq(t.repos.id, repoId));
+    return row?.workspaceId ?? null;
+  }
+
   /** All cached symbols for a repo (from blast's persistence). */
   async getCachedSymbols(repoId: string): Promise<CachedSymbolRow[]> {
     return this.db

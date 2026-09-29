@@ -27,6 +27,8 @@ test/                    *.test.ts (hermetic) · *.it.test.ts (testcontainers Po
 - Background work → container.jobs (register handler + enqueue); run progress → container.runBus.
 - repo-intel enrichment is best-effort: catch, log, degrade — never fail a review run.
 - Relative imports use the `.js` suffix (ESM).
+- Onion layers (onion-architecture skill): routes.ts → service.ts (ports only, no Container/Drizzle) → repository.ts.
+  Check: `pnpm exec depcruise src --config .dependency-cruiser.cjs --ignore-known`; never grow the known-violations baseline.
 
 ## Do not touch
 - src/db/migrations/** — generate new ones only.
@@ -37,4 +39,5 @@ test/                    *.test.ts (hermetic) · *.it.test.ts (testcontainers Po
 - API map / DI flow / env vars / review-context details → README.md
 - Touching the indexer or the repo-intel facade → src/modules/repo-intel/README.md
 - Designing a feature in this package → specs/ · background notes → docs/
+- Placing backend code / a depcruise failure → .claude/skills/onion-architecture/SKILL.md
 - Before any change → read INSIGHTS.md (engineering-insights skill)

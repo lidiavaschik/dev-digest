@@ -38,10 +38,16 @@ export function buildLineIndex(diff: UnifiedDiff): Map<string, Set<number>> {
   return idx;
 }
 
+/**
+ * Iterates the hunk lines (bounded by the diff) rather than the finding's range
+ * (bounded by nothing). start_line/end_line come from the model, which is in
+ * turn influenced by an attacker-controlled diff — a returned range of
+ * 1..999999999 used to spin the loop a billion times per finding.
+ */
 function rangeIntersects(lines: Set<number>, start: number, end: number): boolean {
   const lo = Math.min(start, end);
   const hi = Math.max(start, end);
-  for (let n = lo; n <= hi; n++) if (lines.has(n)) return true;
+  for (const n of lines) if (n >= lo && n <= hi) return true;
   return false;
 }
 

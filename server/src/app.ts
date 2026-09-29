@@ -168,9 +168,22 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
       return;
     }
     app.log.error(err);
-    const e = err as { statusCode?: number; message?: string };
-    reply.status(e.statusCode ?? 500).send({
-      error: { code: 'internal_error', message: e.message ?? 'Internal error' },
+    const e = err as { statusCode?: number; code?: string; message?: string };
+    const status = e.statusCode ?? 500;
+    // Below 500 the error came from Fastify itself (unknown route, malformed
+    // JSON, unsupported media type) — its message is framework text and is safe
+    // and useful to the caller. At 500+ the error is from an unknown source
+    // (Postgres, octokit, simple-git, an LLM SDK) and its message can carry SQL
+    // fragments, column names, filesystem paths or connection details, so it
+    // goes to the log only — the same rule the serialization branch above uses.
+    if (status >= 500) {
+      reply.status(status).send({
+        error: { code: 'internal_error', message: 'Internal error' },
+      });
+      return;
+    }
+    reply.status(status).send({
+      error: { code: e.code ?? 'bad_request', message: e.message ?? 'Request failed' },
     });
   });
 

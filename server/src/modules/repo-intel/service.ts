@@ -19,6 +19,7 @@
  */
 import type { CodeSymbol, RepoRef } from '@devdigest/shared';
 import type { Container } from '../../platform/container.js';
+import { NotFoundError } from '../../platform/errors.js';
 import { extractEndpoints } from '../../adapters/codeindex/extract.js';
 import {
   parseImports,
@@ -103,6 +104,21 @@ export class RepoIntelService implements RepoIntel {
 
   constructor(private container: Container) {
     this.repo = new RepoIntelRepository(container.db);
+  }
+
+  /**
+   * Tenancy guard for the HTTP routes. Every table behind this facade is keyed
+   * by repo_id alone, so a repo id taken from the URL grants access to whatever
+   * workspace owns it unless the caller checks first. NotFoundError (not 403) so
+   * a repo in another workspace is indistinguishable from one that never existed.
+   *
+   * Deliberately NOT part of the `RepoIntel` interface: it is a presentation
+   * concern of this module's routes, and keeping it off the facade leaves test
+   * doubles for `container.repoIntel` unchanged.
+   */
+  async assertRepoInWorkspace(repoId: string, workspaceId: string): Promise<void> {
+    const owner = await this.repo.workspaceIdForRepo(repoId);
+    if (owner !== workspaceId) throw new NotFoundError('Repo not found');
   }
 
   // -------------------------------------------------------------------------

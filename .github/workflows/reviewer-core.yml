@@ -46,4 +46,8 @@ jobs:
 
       - run: npm run typecheck
 
+      # Onion-architecture boundaries: no I/O in the engine, SDK only in src/llm/,
+      # nothing from ../server except @devdigest/shared (.claude/skills/onion-architecture).
+      - run: npm run arch:check
+
       - run: npm test

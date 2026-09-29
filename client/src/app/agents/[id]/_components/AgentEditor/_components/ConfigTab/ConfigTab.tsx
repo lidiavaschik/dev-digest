@@ -25,18 +25,9 @@ export function ConfigTab({ agent }: { agent: Agent }) {
   const [repoIntel, setRepoIntel] = React.useState(agent.repo_intel);
   const [enabled, setEnabled] = React.useState(agent.enabled);
 
-  // Reset local form when switching agents.
-  React.useEffect(() => {
-    setName(agent.name);
-    setDescription(agent.description);
-    setProvider(agent.provider);
-    setModel(agent.model);
-    setSystemPrompt(agent.system_prompt);
-    setStrategy(agent.strategy);
-    setCiFailOn(agent.ci_fail_on);
-    setRepoIntel(agent.repo_intel);
-    setEnabled(agent.enabled);
-  }, [agent.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // No reset Effect here: AgentEditor renders this tab with key={agent.id}, so
+  // switching agents remounts it and the useState seeds above do the reset in
+  // one pass. A re-fetch of the SAME agent deliberately leaves edits in place.
 
   const { data: models } = useProviderModels(provider);
   // Show the price (USD per 1M in/out tokens) in the label when the provider

@@ -85,6 +85,36 @@ describe('citation grounding gate', () => {
     );
     expect(groundingSummary(res)).toBe('1/2 passed');
   });
+
+  // The range comes from the model, which is steered by an attacker-controlled
+  // diff. Walking it integer by integer meant a returned 1..1e9 span burned a
+  // billion iterations per finding; the gate now walks the (diff-bounded) hunk
+  // lines instead.
+  //
+  // Note on how these fail: the loop is synchronous, so re-introducing the bug
+  // does NOT produce a tidy 2s assertion failure — it blocks the event loop and
+  // stalls the whole vitest run until the job times out (measured: >120s). The
+  // kept/dropped assertions below are the precise part; the elapsed check is a
+  // cheap extra signal for an implementation that is merely slower.
+  it('handles an absurd line range without scanning it (bounded by the diff, not the range)', () => {
+    const started = Date.now();
+    const res = groundFindings(
+      [f({ file: 'src/config.ts', start_line: 1, end_line: 1_000_000_000 })],
+      diff,
+    );
+    // Line 11 is inside the span, so the finding is legitimately kept.
+    expect(res.kept).toHaveLength(1);
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it('drops an absurd range that misses every hunk', () => {
+    const res = groundFindings(
+      [f({ file: 'src/config.ts', start_line: 500_000, end_line: 1_000_000_000 })],
+      diff,
+    );
+    expect(res.kept).toHaveLength(0);
+    expect(res.dropped).toHaveLength(1);
+  });
 });
 
 describe('unified diff parser', () => {

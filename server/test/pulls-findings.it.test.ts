@@ -75,6 +75,33 @@ d('PR list findings breakdown (Testcontainers pg)', () => {
     return { repo: repo!, prs, pr: prs[0]! };
   }
 
+  /**
+   * reviews.agent_id / run_id are real foreign keys, so a review can only name
+   * an agent and a run that exist. These tests care about GROUPING by distinct
+   * ids, not about the rows' contents — so materialize whatever id the case
+   * hands us, idempotently (the same agent id is reused across re-runs).
+   */
+  async function ensureAgent(id: string): Promise<void> {
+    await pg.handle.db
+      .insert(t.agents)
+      .values({
+        id,
+        workspaceId,
+        name: `fixture-${id.slice(0, 8)}`,
+        provider: 'openai',
+        model: 'gpt-4.1',
+        systemPrompt: 'fixture',
+      })
+      .onConflictDoNothing();
+  }
+
+  async function ensureRun(id: string, prId: string, agentId?: string): Promise<void> {
+    await pg.handle.db
+      .insert(t.agentRuns)
+      .values({ id, workspaceId, prId, ...(agentId ? { agentId } : {}) })
+      .onConflictDoNothing();
+  }
+
   /** `createdAt` is explicit so "which run is latest" never depends on timing. */
   async function insertReview(
     prId: string,
@@ -85,6 +112,8 @@ d('PR list findings breakdown (Testcontainers pg)', () => {
       at?: Date;
     } = {},
   ): Promise<string> {
+    if (opts.agentId) await ensureAgent(opts.agentId);
+    if (opts.runId) await ensureRun(opts.runId, prId, opts.agentId);
     const [row] = await pg.handle.db
       .insert(t.reviews)
       .values({

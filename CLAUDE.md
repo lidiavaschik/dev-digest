@@ -47,7 +47,8 @@ Each package also has docs/ (notes), specs/ (feature specs), INSIGHTS.md (lesson
 - server/clones/** — runtime data (git-ignored); git remotes there contain the GitHub token.
 - server/package.json is `skip-worktree` locally — don't "fix" diffs against committed scripts.
 - .claude/skills/** and skills-lock.json — vendored via the skills CLI, not hand-edited.
-  Exception: .claude/skills/engineering-insights/ is hand-authored for this repo — edit freely.
+  Exceptions: .claude/skills/engineering-insights/, .claude/skills/frontend-architecture/ and
+  .claude/skills/onion-architecture/ are hand-authored for this repo (not in skills-lock.json) — edit freely.
 
 ## Read when
 - Architecture / end-to-end flow → README.md
