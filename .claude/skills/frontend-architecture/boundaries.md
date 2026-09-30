@@ -178,4 +178,4 @@ to shorten an import that was already short.
 client workflow beside `typecheck` — and with Option A it is already there, because it is a
 vitest test.
 
-Adding a new cross-package alias means updating the `paths:` filters, per the root `CLAUDE.md`.
+Adding a new cross-package alias means updating the `paths:` filters, per the root `AGENTS.md`.

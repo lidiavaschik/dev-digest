@@ -156,7 +156,7 @@ plus convention checks.
 | Mean time / tokens | 289 s / 104k | 200 s / 81k |
 
 What the numbers mean:
-- **The baseline already holds the hard boundaries.** It sees the rules in `server/CLAUDE.md`
+- **The baseline already holds the hard boundaries.** It sees the rules in `server/AGENTS.md`
   and runs depcruise, so routes without DB, reviewer-core without I/O and a clean depcruise run
   passed in both configurations.
 - **What only the skill produced:**

@@ -2,7 +2,7 @@
 Lessons learned while working in this package (by humans or agents).
 Maintained via the engineering-insights skill (.claude/skills/engineering-insights) — read it
 before work, add only verified non-obvious lessons after. Newest first within a section.
-Keep each entry ≤5 lines. Agents only append; changing, moving to CLAUDE.md or deleting existing entries needs the user's OK.
+Keep each entry ≤5 lines. Agents only append; changing, moving to AGENTS.md or deleting existing entries needs the user's OK.
 
 <!-- Entry format:
 ### YYYY-MM-DD — short title
@@ -26,7 +26,7 @@ Keep each entry ≤5 lines. Agents only append; changing, moving to CLAUDE.md or
 - Evidence: src/modules/repo-intel/routes.ts:38 · src/modules/repo-intel/service.ts assertRepoInWorkspace · test/repo-intel-tenancy.it.test.ts (3 of 4 fail without the assert)
 
 ## Codebase Patterns
-<!-- Non-obvious conventions or decisions with rationale, not already in CLAUDE.md -->
+<!-- Non-obvious conventions or decisions with rationale, not already in AGENTS.md -->
 
 ### 2026-09-30 — never mix the DB clock and the app clock on one timestamp column
 - What: `skills.updated_at` defaulted to Postgres `now()` on insert but was set to JS `new Date()` on update; `updated_at(v2) >= updated_at(v1)` flaked in the testcontainer (…239 → …234).

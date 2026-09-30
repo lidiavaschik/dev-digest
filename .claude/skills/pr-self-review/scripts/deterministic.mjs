@@ -1,4 +1,4 @@
-// Checks that need no LLM: repo rules from CLAUDE.md that are pure path/text facts.
+// Checks that need no LLM: repo rules from AGENTS.md that are pure path/text facts.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -36,7 +36,7 @@ export function deterministicFindings(root, files, added) {
   const out = [];
   const byPath = new Map(files.map((f) => [f.path, f]));
 
-  // Migrations are append-only (CLAUDE.md "Do not touch"). drizzle-kit legitimately rewrites
+  // Migrations are append-only (AGENTS.md "Do not touch"). drizzle-kit legitimately rewrites
   // _journal.json when it appends a migration, so the journal is only suspicious on its own.
   const newSql = files.some((f) => f.path.startsWith(MIGRATIONS_DIR) && f.path.endsWith(".sql") && f.status === "A");
   for (const f of files.filter((f) => f.path.startsWith(MIGRATIONS_DIR) && f.status !== "A")) {
@@ -56,7 +56,7 @@ export function deterministicFindings(root, files, added) {
     if (mirrorChanged || (!mirrorExists && f.status !== "A")) continue;
     out.push(
       finding("shared-contract-not-mirrored", "CRITICAL", f.path, `contract changed but ${mirror} was not updated`, {
-        fix: `Apply the same change to ${mirror} (CLAUDE.md: mirror server/src/vendor/shared in client/src/vendor/shared).`,
+        fix: `Apply the same change to ${mirror} (AGENTS.md: mirror server/src/vendor/shared in client/src/vendor/shared).`,
       }),
     );
   }

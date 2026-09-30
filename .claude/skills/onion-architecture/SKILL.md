@@ -90,7 +90,7 @@ lesson — the boundary is cheapest to hold at the first file.
 ## Workflow
 
 **Before writing backend code**
-1. Read `<pkg>/CLAUDE.md` and `<pkg>/INSIGHTS.md` (repo rule).
+1. Read `<pkg>/AGENTS.md` and `<pkg>/INSIGHTS.md` (repo rule).
 2. Place each new piece with the decision tree in [layers.md](layers.md). If the answer is "the
    route", it is almost always wrong unless the code is parsing or shaping HTTP.
 3. Need something external (DB, LLM, GitHub, clock, fs)? Declare a port first (rule 3/5), then

@@ -2,7 +2,7 @@
 Lessons learned while working in this package (by humans or agents).
 Maintained via the engineering-insights skill (.claude/skills/engineering-insights) — read it
 before work, add only verified non-obvious lessons after. Newest first within a section.
-Keep each entry ≤5 lines. Agents only append; changing, moving to CLAUDE.md or deleting existing entries needs the user's OK.
+Keep each entry ≤5 lines. Agents only append; changing, moving to AGENTS.md or deleting existing entries needs the user's OK.
 
 <!-- Entry format:
 ### YYYY-MM-DD — short title
@@ -20,7 +20,7 @@ Keep each entry ≤5 lines. Agents only append; changing, moving to CLAUDE.md or
 <!-- Failed approaches / anti-patterns, with the reason -->
 
 ## Codebase Patterns
-<!-- Non-obvious conventions or decisions with rationale, not already in CLAUDE.md -->
+<!-- Non-obvious conventions or decisions with rationale, not already in AGENTS.md -->
 
 ### 2026-09-22 — a popover inside the PR-list table must be portalled to <body>
 - What: `s.tableCard` sets `overflow: "hidden"` for its rounded corners, so any panel rendered inside a row is clipped at the table edge; the kit `Dropdown` hits the same wall (it is `position: absolute` and click-triggered).

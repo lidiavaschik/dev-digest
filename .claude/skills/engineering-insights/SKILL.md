@@ -65,12 +65,12 @@ Insights wrap-up:
 
 ### The gate — write only if ALL five are "yes"
 
-1. **Non-obvious** — not evident from reading the code, `<pkg>/CLAUDE.md`, README or TESTING.md.
+1. **Non-obvious** — not evident from reading the code, `<pkg>/AGENTS.md`, README or TESTING.md.
 2. **Worth it** — it cost time, or will save ≥5 minutes next time.
 3. **Actionable cold** — names a concrete file, command, value or error; a fresh agent can act on it without re-investigating.
 4. **Verified** — confirmed in this session (fix worked, behaviour observed). Promising but
    unverified → record it under Open Questions instead.
-5. **New** — not already in INSIGHTS.md or CLAUDE.md.
+5. **New** — not already in INSIGHTS.md or AGENTS.md.
 
 If it refines or contradicts an existing entry → don't touch that entry and don't add a second,
 conflicting one: propose the change to the user (see "Existing entries" below).
@@ -122,7 +122,7 @@ ERROR or WARN in an existing entry → add it to "Proposed insight changes" (fla
 
 ### Report (last line of your answer)
 
-`Insights: +2 new (server), 1 skipped (already in server/CLAUDE.md), 1 change proposed`
+`Insights: +2 new (server), 1 skipped (already in server/AGENTS.md), 1 change proposed`
 or `Insights: nothing new`. Proposed changes to existing entries follow as a list (see above).
 
 ## Audit mode
@@ -133,7 +133,7 @@ Audit is read-only until the user approves — it produces a list of proposals, 
 2. Stale entries (Evidence path gone, code changed) → propose update or delete.
 3. Duplicates / contradictions → propose one merged, authoritative entry.
 4. Open Questions answered by now → propose moving the answer into its section.
-5. Stable rules → propose promoting them into `<pkg>/CLAUDE.md` (and removing them from INSIGHTS).
+5. Stable rules → propose promoting them into `<pkg>/AGENTS.md` (and removing them from INSIGHTS).
 6. Show the proposals in the "Proposed insight changes" format; apply only the ones the user approves.
 
 ## Gotchas
@@ -144,5 +144,5 @@ Audit is read-only until the user approves — it produces a list of proposals, 
 - Project lessons go to INSIGHTS.md (committed, shared with the team), not to the agent's personal
   auto-memory — that is for the user's own preferences.
 - Only the 6 sections of INSIGHTS.md — don't create LEARNINGS.md, NOTES.md or new sections.
-- Never edit or delete an existing entry or CLAUDE.md without the user's explicit OK — propose instead.
+- Never edit or delete an existing entry or AGENTS.md without the user's explicit OK — propose instead.
 - Never add an entry just to show the loop ran; generic advice ("be careful with async") always fails gate #3.

@@ -1,7 +1,7 @@
 # Testing per layer
 
 Where a test goes and what it may stub follows from the layer. The file naming rule from
-`server/CLAUDE.md` still applies: anything importing `test/helpers/pg.ts` is `*.it.test.ts`.
+`server/AGENTS.md` still applies: anything importing `test/helpers/pg.ts` is `*.it.test.ts`.
 
 | Layer | Test type | Doubles | File | Needs Docker |
 |---|---|---|---|---|

@@ -61,7 +61,7 @@ No route imports another route's `_components/`.
 
 ### `styles.ts` — the house form (target state, not current state)
 
-**Read this before applying the rule.** `client/CLAUDE.md` documents `styles.ts` as the
+**Read this before applying the rule.** `client/AGENTS.md` documents `styles.ts` as the
 convention, but the tree does not match it yet: 24 `styles.ts` files against 294 inline
 `style={{ … }}` literals across `client/src`. So this section describes where the codebase is
 going, not where it is.
@@ -121,7 +121,7 @@ backend is a separate Fastify service. The DAL guidance in [nextjs-architecture.
 
 `@devdigest/shared` (`src/vendor/shared`) is the source of truth, and it is a **copy** of
 `server/src/vendor/shared`. A contract change must be mirrored into both in the same change —
-that rule comes from the root `CLAUDE.md` and outranks anything here.
+that rule comes from the root `AGENTS.md` and outranks anything here.
 
 - `lib/types.ts` re-exports the contracts. It is also the only legal home for a UI-only view
   model shared across routes.

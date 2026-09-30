@@ -2,7 +2,7 @@
 Lessons learned while working in this package (by humans or agents).
 Maintained via the engineering-insights skill (.claude/skills/engineering-insights) — read it
 before work, add only verified non-obvious lessons after. Newest first within a section.
-Keep each entry ≤5 lines. Agents only append; changing, moving to CLAUDE.md or deleting existing entries needs the user's OK.
+Keep each entry ≤5 lines. Agents only append; changing, moving to AGENTS.md or deleting existing entries needs the user's OK.
 
 <!-- Entry format:
 ### YYYY-MM-DD — short title
@@ -26,7 +26,7 @@ Keep each entry ≤5 lines. Agents only append; changing, moving to CLAUDE.md or
 - Evidence: src/prompt.ts (skillsBlock/memoryBlock comment) · test/prompt.test.ts "neutralizes delimiters in a skill body without wrapping skills as data"
 
 ## Codebase Patterns
-<!-- Non-obvious conventions or decisions with rationale, not already in CLAUDE.md -->
+<!-- Non-obvious conventions or decisions with rationale, not already in AGENTS.md -->
 
 ## Tool & Library Notes
 <!-- Quirks of dependencies and tools -->

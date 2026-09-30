@@ -104,8 +104,8 @@ Grouped by what they contributed. ✓ marks a source read in full while writing 
 
 ### In-repo sources
 
-`CLAUDE.md` (package boundaries, the vendored-contract mirror rule, the do-not-touch list) ·
-`client/CLAUDE.md` (the component folder shape, the data-access rule, styling and i18n
+`AGENTS.md` (package boundaries, the vendored-contract mirror rule, the do-not-touch list) ·
+`client/AGENTS.md` (the component folder shape, the data-access rule, styling and i18n
 conventions) · `client/INSIGHTS.md` (real pitfalls already hit) · `TESTING.md` ·
 the sibling skills `react-best-practices`, `next-best-practices`, `react-testing-library`,
 `engineering-insights`.
