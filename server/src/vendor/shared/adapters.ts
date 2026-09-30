@@ -286,3 +286,22 @@ export interface SecretsProvider {
    */
   set?(key: SecretKey, value: string): Promise<void>;
 }
+
+// ---------- Skill fetcher (import a skill from an https URL) ----------
+export interface FetchedSkillFile {
+  /** Raw response body (≤ 2 MB). */
+  bytes: Uint8Array;
+  /** Name handed to the import parser — always ends in .md / .markdown / .zip. */
+  filename: string;
+  /** URL the bytes were actually read from (after GitHub normalization + redirects). */
+  finalUrl: string;
+}
+
+/**
+ * Downloads a skill file from a user-supplied URL. Implementations MUST be
+ * SSRF-safe: https only, no private/loopback/link-local targets (every redirect
+ * hop re-validated), bounded time and size. Refusals are 422 AppErrors.
+ */
+export interface SkillFetcher {
+  fetch(url: string): Promise<FetchedSkillFile>;
+}

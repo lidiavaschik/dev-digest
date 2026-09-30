@@ -2,6 +2,7 @@
 name: pr-self-review
 description: Reviews ALL local changes on the branch (commits vs main + staged + unstaged + untracked) against the repo's own skills before a pull request exists — UI skills on client/ files, backend architecture skills on server/ and reviewer-core/ files — plus typecheck, depcruise and related unit tests, and blocks push / PR creation / merge while any CRITICAL finding remains. Use before `git push`, before `gh pr create` or `gh pr merge`, when the user says "self review", "review my changes", "ready for PR", "open a PR", /pr-self-review, and ALWAYS when a command was blocked by the "pr-self-review gate" hook. Does NOT review a remote GitHub PR by number (use code-review) and does not fix code on its own.
 argument-hint: "[--fresh]"
+disable-model-invocation: true
 ---
 
 # PR Self Review

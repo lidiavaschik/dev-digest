@@ -6,7 +6,10 @@ import {
   GENERAL_REVIEWER_PROMPT,
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
+  TEST_QUALITY_REVIEWER_PROMPT,
+  API_CONTRACT_REVIEWER_PROMPT,
 } from './seed-prompts.js';
+import { API_CONTRACT_SKILLS, TEST_QUALITY_SKILLS, type SeedSkill } from './seed-skills.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -21,8 +24,11 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  * with a few findings, and the three built-in agents (General + Security +
  * Performance), all on the default openrouter/deepseek-v4-flash provider+model.
  *
- * Course lessons populate the other tables (skills, conventions, memory, eval,
- * …) once their features are built — they start empty here.
+ * L02 adds two skill-driven agents (Test Quality + API Contract) with their
+ * built-in skills, links and v1 snapshots (agent_versions + skill_versions).
+ *
+ * Course lessons populate the other tables (conventions, memory, eval, …) once
+ * their features are built — they start empty here.
  */
 
 export const DEFAULT_WORKSPACE_NAME = 'default';
@@ -220,7 +226,120 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
     if (!existing) await db.insert(t.agents).values(a);
   }
 
+  // ---- L02: skill-driven agents + their skills ----
+  // Prompts are deliberately generic; the concrete checklists live in the
+  // skills (seed-skills.ts), so running with/without skills shows the delta.
+  const skillAgents: Array<{ agent: typeof t.agents.$inferInsert; skills: SeedSkill[] }> = [
+    {
+      agent: {
+        workspaceId,
+        name: 'Test Quality Reviewer',
+        description:
+          'Reviews test quality — uncovered branches, missing corner cases, over-mocking, flaky tests.',
+        provider: DEFAULT_PROVIDER,
+        model: DEFAULT_MODEL,
+        systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
+        enabled: true,
+        version: 1,
+        createdBy: userId,
+      },
+      skills: TEST_QUALITY_SKILLS,
+    },
+    {
+      agent: {
+        workspaceId,
+        name: 'API Contract Reviewer',
+        description:
+          'Detects breaking API contract changes — routes, methods, schemas, removed fields, status codes.',
+        provider: DEFAULT_PROVIDER,
+        model: DEFAULT_MODEL,
+        systemPrompt: API_CONTRACT_REVIEWER_PROMPT,
+        enabled: true,
+        version: 1,
+        createdBy: userId,
+      },
+      skills: API_CONTRACT_SKILLS,
+    },
+  ];
+  for (const { agent, skills } of skillAgents) {
+    const skillRows = [];
+    for (const s of skills) skillRows.push(await ensureSkill(db, workspaceId, s));
+
+    const [existing] = await db
+      .select()
+      .from(t.agents)
+      .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, agent.name)));
+    // Links + v1 snapshot only on first creation: a re-seed must not undo a
+    // user's unlink/reorder of these skills.
+    if (existing) continue;
+    const [row] = await db.insert(t.agents).values(agent).returning();
+    await db.insert(t.agentSkills).values(
+      skillRows.map((sk, i) => ({ agentId: row!.id, skillId: sk.id, order: i, enabled: true })),
+    );
+    await db
+      .insert(t.agentVersions)
+      .values({
+        agentId: row!.id,
+        version: row!.version,
+        configJson: {
+          provider: row!.provider,
+          model: row!.model,
+          system_prompt: row!.systemPrompt,
+          output_schema: row!.outputSchema,
+          strategy: row!.strategy,
+          ci_fail_on: row!.ciFailOn,
+          repo_intel: row!.repoIntel,
+          skills: skillRows.map((sk, i) => ({
+            skill_id: sk.id,
+            skill_version: sk.version,
+            order: i,
+            enabled: true,
+          })),
+        },
+      })
+      .onConflictDoNothing();
+  }
+
   return { workspaceId, userId };
+}
+
+/** Find a skill by (workspace, name) or create it with its v1 snapshot. */
+async function ensureSkill(
+  db: Db,
+  workspaceId: string,
+  s: SeedSkill,
+): Promise<typeof t.skills.$inferSelect> {
+  const [existing] = await db
+    .select()
+    .from(t.skills)
+    .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, s.name)));
+  if (existing) return existing;
+  const [row] = await db
+    .insert(t.skills)
+    .values({
+      workspaceId,
+      name: s.name,
+      description: s.description,
+      type: s.type,
+      source: 'manual',
+      body: s.body,
+      enabled: true,
+      version: 1,
+    })
+    .returning();
+  await db
+    .insert(t.skillVersions)
+    .values({
+      skillId: row!.id,
+      version: 1,
+      name: s.name,
+      description: s.description,
+      type: s.type,
+      body: s.body,
+      message: 'Seeded',
+    })
+    .onConflictDoNothing();
+  return row!;
 }
 
 // CLI entrypoint

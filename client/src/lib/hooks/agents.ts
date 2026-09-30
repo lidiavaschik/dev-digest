@@ -3,7 +3,14 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
-import type { Agent, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
+import type {
+  Agent,
+  AgentSkill,
+  ModelInfo,
+  Provider,
+  ReviewStrategy,
+  SetAgentSkillsInput,
+} from "@devdigest/shared";
 
 export function useAgents() {
   return useQuery({
@@ -76,6 +83,31 @@ export function useDeleteAgent() {
     onSuccess: (_d, id) => {
       qc.invalidateQueries({ queryKey: ["agents"] });
       qc.removeQueries({ queryKey: ["agent", id] });
+    },
+  });
+}
+
+/** Skills linked to an agent, in prompt order (with per-agent enabled). */
+export function useAgentSkills(agentId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["agent-skills", agentId],
+    queryFn: () => api.get<AgentSkill[]>(`/agents/${agentId}/skills`),
+    enabled: !!agentId,
+  });
+}
+
+/** Replace an agent's skill set; array order = prompt order. Bumps the agent version. */
+export function useSetAgentSkills() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, items }: { agentId: string } & SetAgentSkillsInput) =>
+      api.put<AgentSkill[]>(`/agents/${agentId}/skills`, { items }),
+    onSuccess: (data, { agentId }) => {
+      qc.setQueryData(["agent-skills", agentId], data);
+      qc.invalidateQueries({ queryKey: ["agent", agentId] });
+      qc.invalidateQueries({ queryKey: ["agents"] });
+      qc.invalidateQueries({ queryKey: ["skills"] });
+      qc.invalidateQueries({ queryKey: ["skill-usage"] });
     },
   });
 }

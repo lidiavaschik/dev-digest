@@ -1,6 +1,13 @@
-import type { Agent, AgentVersion, CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
+import type {
+  Agent,
+  AgentSkill,
+  AgentVersion,
+  CiFailOn,
+  Provider,
+  ReviewStrategy,
+} from '@devdigest/shared';
 import { AgentVersionConfig } from '@devdigest/shared';
-import type { AgentRow, AgentVersionRow } from './repository.js';
+import type { AgentRow, AgentVersionRow, LinkedSkillRow } from './repository.js';
 
 /**
  * Pure helpers for the agents module — DB row ⇄ DTO mapping and the
@@ -8,8 +15,11 @@ import type { AgentRow, AgentVersionRow } from './repository.js';
  * implementations.
  */
 
-/** Map a persisted agent row to the public `Agent` DTO. */
-export function toAgentDto(row: AgentRow): Agent {
+/**
+ * Map a persisted agent row to the public `Agent` DTO. `skillCount` is the
+ * number of linked skills (omitted → null, e.g. right after create/update).
+ */
+export function toAgentDto(row: AgentRow, skillCount?: number): Agent {
   return {
     id: row.id,
     name: row.name,
@@ -23,6 +33,28 @@ export function toAgentDto(row: AgentRow): Agent {
     strategy: row.strategy as ReviewStrategy,
     ci_fail_on: row.ciFailOn as CiFailOn,
     repo_intel: row.repoIntel,
+    skill_count: skillCount ?? null,
+  };
+}
+
+/** Map a linked-skill join row to the `AgentSkill` DTO (full skill + its slot). */
+export function toAgentSkillDto(link: LinkedSkillRow): AgentSkill {
+  const s = link.skill;
+  return {
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    type: s.type,
+    source: s.source,
+    body: s.body,
+    enabled: s.enabled,
+    version: s.version,
+    evidence_files: s.evidenceFiles ?? null,
+    tokens: null,
+    agent_count: null,
+    updated_at: s.updatedAt.toISOString(),
+    order: link.order,
+    link_enabled: link.enabled,
   };
 }
 

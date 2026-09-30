@@ -1,0 +1,50 @@
+import type { CSSProperties } from "react";
+import { FONT_SIZE, LINE_HEIGHT, PAD_Y, VISIBLE_ROWS } from "./constants";
+
+export const s = {
+  panel: {
+    border: "1px solid var(--border-strong)",
+    borderRadius: 8,
+    background: "var(--bg-elevated)",
+    overflow: "hidden",
+  } satisfies CSSProperties,
+  header: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 12px",
+    borderBottom: "1px solid var(--border)",
+    background: "var(--bg-surface)",
+  } satisfies CSSProperties,
+  fileIcon: { color: "var(--text-muted)" } satisfies CSSProperties,
+  filename: { fontSize: 12.5, color: "var(--text-secondary)" } satisfies CSSProperties,
+  tokens: { marginLeft: "auto", fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
+  editor: { display: "flex", height: VISIBLE_ROWS * LINE_HEIGHT + PAD_Y * 2 } satisfies CSSProperties,
+  gutter: {
+    flexShrink: 0,
+    minWidth: 44,
+    padding: `${PAD_Y}px 10px ${PAD_Y}px 8px`,
+    overflow: "hidden",
+    textAlign: "right",
+    borderRight: "1px solid var(--border)",
+    color: "var(--text-muted)",
+    fontFamily: "var(--font-mono, ui-monospace, monospace)",
+    fontSize: FONT_SIZE - 1,
+    lineHeight: `${LINE_HEIGHT}px`,
+    userSelect: "none",
+  } satisfies CSSProperties,
+  lineNo: { height: LINE_HEIGHT } satisfies CSSProperties,
+  textarea: {
+    flex: 1,
+    resize: "none",
+    padding: `${PAD_Y}px 12px`,
+    border: "none",
+    outline: "none",
+    background: "transparent",
+    color: "var(--text-primary)",
+    fontSize: FONT_SIZE,
+    lineHeight: `${LINE_HEIGHT}px`,
+    whiteSpace: "pre",
+    overflow: "auto",
+  } satisfies CSSProperties,
+} as const;

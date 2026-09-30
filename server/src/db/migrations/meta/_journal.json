@@ -92,6 +92,13 @@
       "when": 1790715662886,
       "tag": "0012_panoramic_thunderbolts",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790772372052,
+      "tag": "0013_panoramic_lilandra",
+      "breakpoints": true
     }
   ]
 }

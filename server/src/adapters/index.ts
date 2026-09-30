@@ -9,4 +9,5 @@ export { SimpleGitClient } from './git/simple-git.js';
 export { parseUnifiedDiff } from './git/diff-parser.js';
 export { RipgrepCodeIndex } from './codeindex/ripgrep.js';
 export { estimateCost } from './llm/pricing.js';
+export { HttpsSkillFetcher } from './skill-fetch/fetcher.js';
 export * from './mocks.js';

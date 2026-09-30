@@ -6,7 +6,7 @@ import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
 import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './repository.js';
 import { REVIEW_STRATEGY } from './constants.js';
-import { taskLine } from './helpers.js';
+import { renderSkillBlocks, skillsLogLine, taskLine, type PromptSkill } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
@@ -185,6 +185,11 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // L02 — linked skills that are enabled globally AND for this agent, in
+      // link order. Best-effort: a load failure degrades to no skills.
+      const skills = await this.loadActiveSkills(agent.id, runLog);
+      const skillBlocks = renderSkillBlocks(skills);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -202,6 +207,8 @@ export class ReviewRunExecutor {
         ...(callersDigest ? { callers: callersDigest } : {}),
         // T3 — repo skeleton, same omit-when-empty contract.
         ...(repoMap ? { repoMap } : {}),
+        // L02 — skill blocks (`### name\nbody`); omitted when none are active.
+        ...(skillBlocks.length > 0 ? { skills: skillBlocks } : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
@@ -272,7 +279,14 @@ export class ReviewRunExecutor {
           findings: findingRows.length,
           grounding,
         },
-        prompt_assembly: outcome.assembly,
+        prompt_assembly: {
+          ...outcome.assembly,
+          // reviewer-core has no tokenizer (pure); count the skills block exactly
+          // as it was sent (post-neutralization) with the server tokenizer.
+          skills_tokens: outcome.assembly.skills
+            ? this.container.tokenizer.count(outcome.assembly.skills)
+            : null,
+        },
         tool_calls: outcome.chunks.map((c) => ({
           tool: 'review_file',
           args: c.label,
@@ -315,6 +329,22 @@ export class ReviewRunExecutor {
         .catch(() => undefined);
       this.container.runBus.complete(runId);
       throw err;
+    }
+  }
+
+  /**
+   * Active skills for an agent (skills.enabled AND agent_skills.enabled), in
+   * link order. Never fails the run: on error, log and review without skills.
+   */
+  private async loadActiveSkills(agentId: string, runLog: RunLogger): Promise<PromptSkill[]> {
+    try {
+      const links = await this.agents.linkedSkills(agentId, { onlyActive: true });
+      const skills = links.map((l) => ({ name: l.skill.name, body: l.skill.body }));
+      runLog.info(skillsLogLine(skills));
+      return skills;
+    } catch (err) {
+      runLog.info(`skills: failed to load — ${(err as Error).message}; reviewing without skills`);
+      return [];
     }
   }
 
@@ -427,7 +457,14 @@ export class ReviewRunExecutor {
         source: 'local',
       },
       stats: { duration_ms: durationMs, tokens_in: 0, tokens_out: 0, cost_usd: null, findings: 0, grounding },
-      prompt_assembly: { system: agent.systemPrompt, skills: null, memory: null, specs: null, user: '' },
+      prompt_assembly: {
+        system: agent.systemPrompt,
+        skills: null,
+        skills_tokens: null,
+        memory: null,
+        specs: null,
+        user: '',
+      },
       tool_calls: [],
       raw_output: '',
       memory_pulled: [],

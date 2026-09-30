@@ -39,6 +39,8 @@ export type ToolCall = z.infer<typeof ToolCall>;
 export const PromptAssembly = z.object({
   system: z.string(),
   skills: z.string().nullish(),
+  /** Token count the skills block added to the prompt; null when no skills. */
+  skills_tokens: z.number().int().nullish(),
   memory: z.string().nullish(),
   specs: z.string().nullish(),
   /** Callers-of-changed-symbols digest (T1.3); null when absent. */

@@ -9,6 +9,16 @@ in the DB). The canonical, reviewable copies live next to this file:
 - [`general-reviewer.md`](./general-reviewer.md)
 - [`security-reviewer.md`](./security-reviewer.md)
 - [`performance-reviewer.md`](./performance-reviewer.md)
+- [`test-quality.md`](./test-quality.md) — Test Quality Reviewer (L02)
+- [`api-contract.md`](./api-contract.md) — API Contract Reviewer (L02)
+
+The two L02 prompts are deliberately **generic**: the concrete checklists live in
+linked skills (`untested-branches`, `missing-corner-cases`, `over-mocking`,
+`flaky-tests`, `route-signature-breaking-change` — seeded from
+`server/src/db/seed-skills.ts`). That split is what makes the skills control
+experiment meaningful: run the agent with its skills disabled, then enabled, and
+compare findings. Skills arrive in the `## Skills / rules` section as one
+`### <name>` block per active skill, in link order (see below).
 
 > The DB is the source of truth at run time. These files are the human-readable
 > originals — when you change a prompt, edit the file here **and** push it to the
@@ -38,7 +48,7 @@ delimiter-wrapped (`prompt.ts:104-122`):
 ```
 <task line, e.g. "Review PR #7 '…'">
 ## PR description        (untrusted, author-controlled, truncated to 4000 chars)
-## Skills / rules        (linked skill bodies)
+## Skills / rules        (active linked skills: `### <name>` + body, in link order)
 ## Relevant memory       (curated memory items)
 ## Repo skeleton         (untrusted, repo-derived)
 ## Project context       (untrusted spec chunks)

@@ -1,6 +1,7 @@
 import type { Container } from '../../platform/container.js';
 import type {
   Agent,
+  AgentSkill,
   AgentSkillLink,
   AgentVersion,
   CiFailOn,
@@ -9,7 +10,8 @@ import type {
   ReviewStrategy,
 } from '@devdigest/shared';
 import { AgentsRepository } from './repository.js';
-import { toAgentDto, toAgentVersionDto } from './helpers.js';
+import { toAgentDto, toAgentSkillDto, toAgentVersionDto } from './helpers.js';
+import { NotFoundError, ValidationError } from '../../platform/errors.js';
 
 /**
  * A2 — agents service. Business logic for the Agents tab + Agent Editor.
@@ -57,12 +59,15 @@ export class AgentsService {
 
   async list(workspaceId: string): Promise<Agent[]> {
     const rows = await this.repo.list(workspaceId);
-    return rows.map(toAgentDto);
+    const counts = await this.repo.countSkillsByAgent(rows.map((r) => r.id));
+    return rows.map((r) => toAgentDto(r, counts.get(r.id) ?? 0));
   }
 
   async get(workspaceId: string, id: string): Promise<Agent | undefined> {
     const row = await this.repo.getById(workspaceId, id);
-    return row ? toAgentDto(row) : undefined;
+    if (!row) return undefined;
+    const counts = await this.repo.countSkillsByAgent([row.id]);
+    return toAgentDto(row, counts.get(row.id) ?? 0);
   }
 
   /** Delete an agent (and its versions/skill-links, via cascade). */
@@ -85,7 +90,7 @@ export class AgentsService {
       enabled: input.enabled,
       createdBy: userId ?? null,
     });
-    return toAgentDto(row);
+    return toAgentDto(row, 0);
   }
 
   async update(
@@ -105,7 +110,9 @@ export class AgentsService {
       ...(patch.repo_intel !== undefined ? { repoIntel: patch.repo_intel } : {}),
       ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
     });
-    return row ? toAgentDto(row) : undefined;
+    if (!row) return undefined;
+    const counts = await this.repo.countSkillsByAgent([row.id]);
+    return toAgentDto(row, counts.get(row.id) ?? 0);
   }
 
   /**
@@ -138,37 +145,88 @@ export class AgentsService {
   /** Linked skills for an agent as AgentSkillLink[] (ordered). */
   async skillLinks(agentId: string): Promise<AgentSkillLink[]> {
     const links = await this.repo.linkedSkills(agentId);
-    return links.map((l) => ({ agent_id: agentId, skill_id: l.skill.id, order: l.order }));
+    return links.map((l) => ({
+      agent_id: agentId,
+      skill_id: l.skill.id,
+      order: l.order,
+      enabled: l.enabled,
+    }));
+  }
+
+  /** Linked skills for an agent as full AgentSkill DTOs (ordered); undefined → 404. */
+  async agentSkills(workspaceId: string, agentId: string): Promise<AgentSkill[] | undefined> {
+    const agent = await this.repo.getById(workspaceId, agentId);
+    if (!agent) return undefined;
+    const links = await this.repo.linkedSkills(agentId);
+    return links.map(toAgentSkillDto);
   }
 
   /**
-   * Set / reorder the agent's linked skills. If `skillIds` is provided, replaces
-   * the whole set in that order. Returns the resulting ordered links.
+   * Replace an agent's skill set (array order = prompt order, per-agent enabled).
+   * ONE transaction: tenancy check on every skill id (any foreign/unknown id →
+   * 404, nothing written), replace-all, then bump the agent version + snapshot.
+   * Returns undefined when the agent isn't in this workspace.
+   */
+  async replaceSkills(
+    workspaceId: string,
+    agentId: string,
+    items: { skill_id: string; enabled: boolean }[],
+  ): Promise<AgentSkill[] | undefined> {
+    const ids = items.map((i) => i.skill_id);
+    if (new Set(ids).size !== ids.length) {
+      throw new ValidationError('Duplicate skill_id in items');
+    }
+    const ok = await this.repo.transaction(async (repo) => {
+      const agent = await repo.getById(workspaceId, agentId);
+      if (!agent) return false;
+      const found = new Set(await repo.skillIdsInWorkspace(workspaceId, ids));
+      const missing = ids.filter((id) => !found.has(id));
+      if (missing.length > 0) throw new NotFoundError('Skill not found', { skill_ids: missing });
+      await repo.replaceSkillLinks(
+        agentId,
+        items.map((i) => ({ skillId: i.skill_id, enabled: i.enabled })),
+      );
+      await repo.bumpVersion(workspaceId, agentId);
+      return true;
+    });
+    return ok ? this.agentSkills(workspaceId, agentId) : undefined;
+  }
+
+  /**
+   * Legacy POST shape: set / reorder by bare ids (all enabled). Same
+   * transactional replace + version bump as `replaceSkills`.
    */
   async setSkills(
     workspaceId: string,
     agentId: string,
     skillIds: string[],
   ): Promise<AgentSkillLink[] | undefined> {
-    const agent = await this.repo.getById(workspaceId, agentId);
-    if (!agent) return undefined;
-    await this.repo.setSkills(agentId, skillIds);
-    return this.skillLinks(agentId);
+    const res = await this.replaceSkills(
+      workspaceId,
+      agentId,
+      skillIds.map((skill_id) => ({ skill_id, enabled: true })),
+    );
+    return res ? this.skillLinks(agentId) : undefined;
   }
 
-  /** Link a single skill (append or set order) — additive to existing links. */
+  /** Link a single skill (append or set order) — additive; bumps the version. */
   async linkSkill(
     workspaceId: string,
     agentId: string,
     skillId: string,
     order?: number,
   ): Promise<AgentSkillLink[] | undefined> {
-    const agent = await this.repo.getById(workspaceId, agentId);
-    if (!agent) return undefined;
-    const existing = await this.repo.linkedSkills(agentId);
-    const resolvedOrder = order ?? existing.length;
-    await this.repo.linkSkill(agentId, skillId, resolvedOrder);
-    return this.skillLinks(agentId);
+    const ok = await this.repo.transaction(async (repo) => {
+      const agent = await repo.getById(workspaceId, agentId);
+      if (!agent) return false;
+      const found = await repo.skillIdsInWorkspace(workspaceId, [skillId]);
+      if (found.length === 0) throw new NotFoundError('Skill not found');
+      const existing = await repo.linkedSkills(agentId);
+      await repo.linkSkill(agentId, skillId, order ?? existing.length);
+      await repo.bumpVersion(workspaceId, agentId);
+      return true;
+    });
+    return ok ? this.skillLinks(agentId) : undefined;
   }
 
   /**

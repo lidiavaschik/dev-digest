@@ -31,6 +31,12 @@ Keep each entry ≤5 lines. Agents only append; changing, moving to CLAUDE.md or
 ## Tool & Library Notes
 <!-- Quirks of dependencies and tools -->
 
+### 2026-09-30 — `pnpm build` while `pnpm dev` runs breaks the dev server and tsc
+- What: running `pnpm build` (e.g. from a parallel agent) with the dev server up made `/agents` answer 500 until dev recompiled, and `tsc` briefly reported "'/skills' does not satisfy AppRoutes" from stale `.next/types`.
+- Why: both write the same `.next/` dir; build overwrites the dev server's chunks and generated route types.
+- Rule: NEVER run `pnpm build` against a live `pnpm dev`; if you did, re-request the page / re-run tsc before chasing the error.
+- Evidence: `curl localhost:3000/agents` 500 → 200 after recompilation · .next/types/validator.ts
+
 ### 2026-09-22 — "close on scroll" closes a popover when you scroll the popover
 - What: `window.addEventListener("scroll", close, true)` fired for the hover card's OWN scrollable body, so scrolling the findings list shut it mid-read.
 - Why: `scroll` doesn't bubble, so the listener must be capture-phase — and capture runs window→target for EVERY scroll, including inside the popover.

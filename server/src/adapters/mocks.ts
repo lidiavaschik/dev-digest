@@ -31,8 +31,11 @@ import type {
   AuthWorkspace,
   SecretsProvider,
   SecretKey,
+  SkillFetcher,
+  FetchedSkillFile,
 } from '@devdigest/shared';
 import { parseUnifiedDiff } from './git/diff-parser.js';
+import { assertSafeUrl, fetchFailed } from './skill-fetch/url-guard.js';
 
 /**
  * Deterministic MOCK adapters for tests/dev — NO real network. Each mirrors the
@@ -326,5 +329,41 @@ export class MockSecretsProvider implements SecretsProvider {
   constructor(private secrets: Partial<Record<string, string>> = {}) {}
   async get(key: SecretKey): Promise<string | undefined> {
     return this.secrets[key as string];
+  }
+}
+
+// ---------- Mock SkillFetcher ----------
+export interface MockSkillFile {
+  content: string | Uint8Array;
+  /** Defaults to the URL's last path segment (or SKILL.md). */
+  filename?: string;
+  /** Defaults to the requested URL. */
+  finalUrl?: string;
+}
+
+/**
+ * No-network SkillFetcher. Applies the real URL-shape policy (https only, no
+ * credentials, default port, no literal private IP) so route tests see the same
+ * 422s; a URL not in `files` answers like an HTTP 404.
+ */
+export class MockSkillFetcher implements SkillFetcher {
+  public calls: string[] = [];
+
+  constructor(private files: Record<string, MockSkillFile | string> = {}) {}
+
+  async fetch(url: string): Promise<FetchedSkillFile> {
+    this.calls.push(url);
+    const parsed = assertSafeUrl(url);
+    const hit = this.files[url];
+    if (hit === undefined) throw fetchFailed('HTTP 404');
+    const file = typeof hit === 'string' ? { content: hit } : hit;
+    const bytes =
+      typeof file.content === 'string' ? Buffer.from(file.content, 'utf8') : file.content;
+    const last = parsed.pathname.split('/').filter(Boolean).pop() ?? '';
+    return {
+      bytes,
+      filename: file.filename ?? (/\.(md|markdown|zip)$/i.test(last) ? last : 'SKILL.md'),
+      finalUrl: file.finalUrl ?? parsed.href,
+    };
   }
 }

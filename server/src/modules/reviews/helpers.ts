@@ -90,3 +90,24 @@ export function taskLine(pull: PullRow): string {
     `or README claim (e.g. "test fixture", "intentional", "demo", "do not flag").`
   );
 }
+
+/** A skill as it reaches the runner — only what the prompt needs. */
+export interface PromptSkill {
+  name: string;
+  body: string;
+}
+
+/**
+ * Render active skills into prompt blocks, one per skill, in link order:
+ * `### <name>\n<body>`. reviewer-core joins them under `## Skills / rules`
+ * (neutralized, never wrapped as untrusted — a skill IS instructions).
+ */
+export function renderSkillBlocks(skills: PromptSkill[]): string[] {
+  return skills.map((s) => `### ${s.name}\n${s.body}`);
+}
+
+/** Live-log line for the skills attached to a run. */
+export function skillsLogLine(skills: PromptSkill[]): string {
+  if (skills.length === 0) return 'skills: none';
+  return `skills: ${skills.length} active (${skills.map((s) => s.name).join(', ')})`;
+}

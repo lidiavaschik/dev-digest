@@ -1,0 +1,10 @@
+{
+  "name": "Skills Lab renders the seeded skills",
+  "description": "Loads /skills, which opens the first skill, and confirms a seeded Test Quality skill card is rendered. Exercises the skills list route and its API fetch.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/skills"], "label": "load the skills page" },
+    { "cmd": ["wait", "--url", "/skills"], "label": "skills route reached" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "skills fetch settles" },
+    { "cmd": ["wait", "--text", "untested-branches"], "label": "seeded skill card is visible" }
+  ]
+}

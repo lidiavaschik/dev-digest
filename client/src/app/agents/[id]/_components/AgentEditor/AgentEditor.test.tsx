@@ -9,6 +9,11 @@ import { ToastProvider } from "../../../../../lib/toast";
 vi.mock("../../../../../lib/hooks/agents", () => ({
   useUpdateAgent: () => ({ mutate: vi.fn(), isPending: false, isSuccess: false, data: undefined }),
   useProviderModels: () => ({ data: [{ id: "gpt-4.1", provider: "openai" }] }),
+  useAgentSkills: () => ({ data: [], isLoading: false, isError: false }),
+  useSetAgentSkills: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+vi.mock("../../../../../lib/hooks/skills", () => ({
+  useSkills: () => ({ data: [] }),
 }));
 
 import { AgentEditor } from "./AgentEditor";
@@ -51,6 +56,13 @@ describe("A2 Agent Editor (smoke)", () => {
     expect(screen.getByText("Config")).toBeInTheDocument();
     expect(screen.getByText("Configuration")).toBeInTheDocument();
     expect(screen.getByText("Save agent")).toBeInTheDocument();
+    expect(screen.getByText("Skills")).toBeInTheDocument(); // tab label
+  });
+
+  it("renders the Skills tab when ?tab=skills", () => {
+    renderWithIntl(<AgentEditor agent={AGENT} tab="skills" onTab={() => {}} />);
+    expect(screen.getByText("0 of 0 enabled")).toBeInTheDocument();
+    expect(screen.queryByText("Configuration")).not.toBeInTheDocument();
   });
 
   // The form seeds its state from the agent prop, so switching agents must

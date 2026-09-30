@@ -7,11 +7,14 @@ export function SelectInput({
   onChange,
   options,
   mono = true,
+  "aria-label": ariaLabel,
 }: {
   value: string;
   onChange?: (v: string) => void;
   options: (string | { value: string; label: string })[];
   mono?: boolean;
+  /** Accessible name when there is no visible <label> for the select. */
+  "aria-label"?: string;
 }) {
   return (
     <div
@@ -28,6 +31,7 @@ export function SelectInput({
     >
       <select
         className={mono ? "mono" : undefined}
+        aria-label={ariaLabel}
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
         style={{

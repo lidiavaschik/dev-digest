@@ -6,6 +6,7 @@ import type {
   CodeIndex,
   Embedder,
   LLMProvider,
+  SkillFetcher,
 } from '@devdigest/shared';
 import type { AppConfig } from './config.js';
 import type { Db } from '../db/client.js';
@@ -26,10 +27,12 @@ import { ConfigError } from './errors.js';
 import { AgentsRepository } from '../modules/agents/repository.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import { PullsRepo } from '../modules/pulls/repository.js';
+import { SkillsRepository } from '../modules/skills/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import { HttpsSkillFetcher } from '../adapters/skill-fetch/fetcher.js';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -52,6 +55,8 @@ export interface ContainerOverrides {
   /** repo-intel T3 adapters — only the indexer pipeline reads these. */
   depgraph?: DepGraph;
   tokenizer?: Tokenizer;
+  /** Skill import from URL — tests inject MockSkillFetcher (no network). */
+  skillFetcher?: SkillFetcher;
 }
 
 export class Container {
@@ -74,10 +79,12 @@ export class Container {
   private _agentsRepo?: AgentsRepository;
   private _reviewRepo?: ReviewRepository;
   private _pullsRepo?: PullsRepo;
+  private _skillsRepo?: SkillsRepository;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
+  private _skillFetcher?: SkillFetcher;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
     this.config = config;
@@ -104,6 +111,11 @@ export class Container {
 
   get pullsRepo(): PullsRepo {
     return (this._pullsRepo ??= new PullsRepo(this.db));
+  }
+
+  /** Skills repository — also the skills module's UnitOfWork (transactions). */
+  get skillsRepo(): SkillsRepository {
+    return (this._skillsRepo ??= new SkillsRepository(this.db));
   }
 
   get codeIndex(): CodeIndex {
@@ -135,6 +147,13 @@ export class Container {
     if (this.overrides.tokenizer) return this.overrides.tokenizer;
     this._tokenizer ??= new TiktokenTokenizer();
     return this._tokenizer;
+  }
+
+  /** SSRF-safe https fetcher for importing a skill from a URL. */
+  get skillFetcher(): SkillFetcher {
+    if (this.overrides.skillFetcher) return this.overrides.skillFetcher;
+    this._skillFetcher ??= new HttpsSkillFetcher();
+    return this._skillFetcher;
   }
 
   /**

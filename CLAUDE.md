@@ -34,7 +34,8 @@ Each package also has docs/ (notes), specs/ (feature specs), INSIGHTS.md (lesson
 - DB change = edit server/src/db/schema/* then `cd server && pnpm db:generate`.
 - Secrets never go to git/DB: they live in ~/.devdigest/secrets.json (0600) or .env.
 - New cross-package alias → add it to the CI `paths:` filters in .github/workflows.
-- Before `git push` / `gh pr create` / `gh pr merge` → run the pr-self-review skill. A PreToolUse hook
+- Before `git push` / `gh pr create` / `gh pr merge` → the user runs `/pr-self-review` (model auto-invocation
+  is disabled — ask them to run it; don't try to call it via the Skill tool). A PreToolUse hook
   (.claude/settings.json) and .githooks/pre-push block them until it PASSES on the current diff;
   never bypass the gate (--no-verify / PR_SELF_REVIEW_SKIP are for the user only).
 

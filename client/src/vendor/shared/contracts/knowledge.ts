@@ -115,7 +115,13 @@ export type MemoryItem = z.infer<typeof MemoryItem>;
 export const SkillType = z.enum(['rubric', 'convention', 'security', 'custom']);
 export type SkillType = z.infer<typeof SkillType>;
 
-export const SkillSource = z.enum(['manual', 'imported_url', 'extracted', 'community']);
+export const SkillSource = z.enum([
+  'manual',
+  'imported_url',
+  'imported_file',
+  'extracted',
+  'community',
+]);
 export type SkillSource = z.infer<typeof SkillSource>;
 
 export const Skill = z.object({
@@ -128,17 +134,102 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  /** Token count of `body` (server tokenizer); null when not computed. */
+  tokens: z.number().int().nullish(),
+  /** How many agents link this skill (any per-agent enabled state). */
+  agent_count: z.number().int().nullish(),
+  updated_at: z.string().nullish(),
 });
 export type Skill = z.infer<typeof Skill>;
 
+// The `description` is the skill's interface: a directive that tells the agent
+// WHEN to apply it and WHAT to do — the UI hints this under the field.
+export const SkillName = z.string().trim().min(1).max(120);
+
+export const CreateSkillInput = z.object({
+  name: SkillName,
+  description: z.string().max(2000).default(''),
+  type: SkillType.default('custom'),
+  body: z.string().min(1).max(100_000),
+  source: SkillSource.default('manual'),
+  enabled: z.boolean().default(true),
+  /** Version note stored on v1 (e.g. "Imported from foo.zip"). */
+  message: z.string().max(500).nullish(),
+});
+export type CreateSkillInput = z.infer<typeof CreateSkillInput>;
+
+// A change to name/description/type/body creates a new version; `enabled` alone does not.
+export const UpdateSkillInput = z.object({
+  name: SkillName.optional(),
+  description: z.string().max(2000).optional(),
+  type: SkillType.optional(),
+  body: z.string().min(1).max(100_000).optional(),
+  enabled: z.boolean().optional(),
+  /** Optional "what changed" note for the new version. */
+  message: z.string().max(500).nullish(),
+});
+export type UpdateSkillInput = z.infer<typeof UpdateSkillInput>;
+
+export const SkillVersion = z.object({
+  skill_id: z.string(),
+  version: z.number().int(),
+  name: z.string(),
+  description: z.string(),
+  type: SkillType,
+  body: z.string(),
+  message: z.string().nullish(),
+  created_at: z.string(),
+});
+export type SkillVersion = z.infer<typeof SkillVersion>;
+
+/** Result of parsing an uploaded .md / .zip — NOT persisted until the user confirms. */
+export const SkillImportPreview = z.object({
+  filename: z.string(),
+  name: z.string(),
+  description: z.string(),
+  type: SkillType,
+  body: z.string(),
+  /** Archive entries that were NOT stored and never executed. */
+  ignored_files: z.array(z.string()),
+  warnings: z.array(z.string()),
+  /** Where the content was fetched from (URL / community import); null for uploads. */
+  source_url: z.string().nullish(),
+});
+export type SkillImportPreview = z.infer<typeof SkillImportPreview>;
+
+export const SkillUsage = z.object({
+  skill_id: z.string(),
+  agents: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      /** Per-agent switch for this skill. */
+      link_enabled: z.boolean(),
+      order: z.number().int(),
+    }),
+  ),
+});
+export type SkillUsage = z.infer<typeof SkillUsage>;
+
 export const CommunitySkill = z.object({
+  /** Stable catalog id, e.g. "obra/superpowers:systematic-debugging". */
+  id: z.string(),
   name: z.string(),
   repo: z.string(),
   stars: z.number().int(),
   lang: z.string(),
   desc: z.string(),
+  /** https URL of the SKILL.md / .md / .zip — imported through the URL preview flow. */
+  url: z.string(),
+  /** Suggested skill type for the import preview. */
+  type: SkillType.nullish(),
 });
 export type CommunitySkill = z.infer<typeof CommunitySkill>;
+
+export const ImportSkillFromUrlInput = z.object({
+  url: z.string().url().max(2048),
+});
+export type ImportSkillFromUrlInput = z.infer<typeof ImportSkillFromUrlInput>;
 
 // ---- Conventions ----
 export const ConventionCandidate = z.object({
@@ -152,6 +243,8 @@ export const ConventionCandidate = z.object({
 export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
 
 // ---- Agents ----
+// 'openrouter' routes through the OpenAI-compatible API (OpenAIProvider with a
+// custom baseURL) — used by the CI runner for cheap models (DeepSeek/GLM/MiniMax).
 export const Provider = z.enum(['openai', 'anthropic', 'openrouter']);
 export type Provider = z.infer<typeof Provider>;
 
@@ -162,8 +255,12 @@ export type Provider = z.infer<typeof Provider>;
 export const ReviewStrategy = z.enum(['single-pass', 'map-reduce', 'auto']);
 export type ReviewStrategy = z.infer<typeof ReviewStrategy>;
 
-// CI gate policy — when a CI review should BLOCK (REQUEST_CHANGES + fail the
-// check) vs just comment. Deterministic from severities; acted on ONLY in CI.
+// CI gate policy — when a review should BLOCK (REQUEST_CHANGES + fail the check)
+// vs just comment. Deterministic from finding severities, NOT the model's verdict:
+//  - never:    never block, always comment (advisory only)
+//  - critical: block iff >=1 CRITICAL finding (default)
+//  - warning:  block iff >=1 WARNING or CRITICAL finding
+//  - any:      block iff >=1 finding of any severity
 export const CiFailOn = z.enum(['never', 'critical', 'warning', 'any']);
 export type CiFailOn = z.infer<typeof CiFailOn>;
 
@@ -182,6 +279,8 @@ export const Agent = z.object({
   // Inject repo-intel context (repo skeleton + callers + rank note) into this
   // agent's review prompt. Default on; gated again by the global flag.
   repo_intel: z.boolean().default(true),
+  /** Number of linked skills (for the agent card badge). */
+  skill_count: z.number().int().nullish(),
 });
 export type Agent = z.infer<typeof Agent>;
 
@@ -189,5 +288,58 @@ export const AgentSkillLink = z.object({
   agent_id: z.string(),
   skill_id: z.string(),
   order: z.number().int(),
+  /** Per-agent switch; the skill's own `enabled` still gates it globally. */
+  enabled: z.boolean().default(true),
 });
 export type AgentSkillLink = z.infer<typeof AgentSkillLink>;
+
+/** A skill as linked to one agent — full skill + its slot on that agent. */
+export const AgentSkill = Skill.extend({
+  order: z.number().int(),
+  link_enabled: z.boolean(),
+});
+export type AgentSkill = z.infer<typeof AgentSkill>;
+
+/** Replace an agent's skill set; array order = prompt order. */
+export const SetAgentSkillsInput = z.object({
+  items: z
+    .array(z.object({ skill_id: z.string().uuid(), enabled: z.boolean().default(true) }))
+    // every workspace skill is sent (unchecked ones keep their slot)
+    .max(500),
+});
+export type SetAgentSkillsInput = z.infer<typeof SetAgentSkillsInput>;
+
+/** A skill as captured in an agent version snapshot. */
+export const AgentVersionSkill = z.object({
+  skill_id: z.string(),
+  skill_version: z.number().int(),
+  order: z.number().int(),
+  enabled: z.boolean(),
+});
+export type AgentVersionSkill = z.infer<typeof AgentVersionSkill>;
+
+// The immutable config snapshot captured in `agent_versions` whenever an agent's
+// config changes (everything but `enabled`). Mirrors the shape written by the
+// agents repository — provider/model/prompt/output_schema/strategy/gate/repo_intel
+// plus the ordered skill ids linked at snapshot time. Used for reproducibility
+// (eval replays a past version) and for surfacing an agent's edit history.
+export const AgentVersionConfig = z.object({
+  provider: Provider,
+  model: z.string(),
+  system_prompt: z.string(),
+  output_schema: z.unknown().nullish(),
+  strategy: ReviewStrategy,
+  ci_fail_on: CiFailOn,
+  repo_intel: z.boolean(),
+  // Older snapshots stored bare skill ids; newer ones pin the skill version too.
+  skills: z.array(z.union([z.string(), AgentVersionSkill])).default([]),
+});
+export type AgentVersionConfig = z.infer<typeof AgentVersionConfig>;
+
+export const AgentVersion = z.object({
+  agent_id: z.string(),
+  version: z.number().int(),
+  config: AgentVersionConfig,
+  created_at: z.string(),
+});
+export type AgentVersion = z.infer<typeof AgentVersion>;
